@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fauna Duel — animal guessing race</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="page">
+
+  <div class="masthead">
+    <div class="eyebrow">field expedition · two explorers</div>
+    <h1>Fauna Duel</h1>
+    <p class="sub">Name real animals faster than your opponent. Every correct call buys you time — every miss costs you five seconds.</p>
+  </div>
+
+  <div class="card">
+    <label class="field-label" for="username">Your name</label>
+    <input type="text" id="username" maxlength="18" placeholder="e.g. Wren" autocomplete="off">
+    <div class="error-msg" id="name-error"></div>
+  </div>
+
+  <div class="card">
+    <label class="field-label">Start a lobby</label>
+    <p class="hint" style="margin-top:0;margin-bottom:14px;">Creates a 6-digit code for one other player to join.</p>
+    <button class="btn btn-primary" id="create-btn">Create lobby</button>
+  </div>
+
+  <div class="card">
+    <label class="field-label" for="join-code">Join a lobby</label>
+    <input type="text" id="join-code" class="mono" maxlength="6" inputmode="numeric" placeholder="000000" autocomplete="off">
+    <div class="error-msg" id="join-error"></div>
+    <button class="btn btn-secondary" id="join-btn" style="margin-top:12px;">Join lobby</button>
+  </div>
+
+  <p class="hint" id="dict-count" style="margin-top:22px;"></p>
+</div>
+
+<script src="js/firebase-config.js"></script>
+<script type="module" src="js/firebase-init.js"></script>
+<script src="js/animals.js"></script>
+<script src="js/utils.js"></script>
+<script type="module" src="js/home.js"></script>
+</body>
+</html>

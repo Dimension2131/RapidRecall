@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fauna Duel — lobby</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="page">
+
+  <div class="masthead">
+    <div class="eyebrow">lobby <span id="code-eyebrow" class="mono"></span></div>
+    <h1 id="masthead-title">Fauna Duel</h1>
+  </div>
+
+  <!-- Shown only if this browser wasn't the one that created/joined via the home page
+       (e.g. someone opened a shared link directly). -->
+  <div class="card" id="join-panel" style="display:none;">
+    <label class="field-label" for="join-username">Your name</label>
+    <input type="text" id="join-username" maxlength="18" placeholder="e.g. Wren" autocomplete="off">
+    <div class="error-msg" id="join-panel-error"></div>
+    <button class="btn btn-primary" id="join-panel-btn" style="margin-top:12px;">Join this lobby</button>
+  </div>
+
+  <!-- Waiting room -->
+  <div class="card" id="waiting-panel" style="display:none;">
+    <label class="field-label">Share this code with the other explorer</label>
+    <div class="code-plate">
+      <div class="code-value" id="waiting-code">------</div>
+    </div>
+    <div class="copy-row">
+      <button class="btn btn-secondary" id="copy-code-btn">Copy code</button>
+      <button class="btn btn-secondary" id="copy-link-btn">Copy link</button>
+    </div>
+    <div class="spinner-row">
+      <div class="dot-pulse"></div> Waiting for opponent to join…
+    </div>
+  </div>
+
+  <!-- Main game -->
+  <div class="game-wrap" id="game-panel" style="display:none;">
+
+    <div class="players-row">
+      <div class="player-panel" id="panel-p1">
+        <div class="p-name"><span id="name-p1">Player 1</span><span class="you-tag" id="you-tag-p1" style="display:none;">YOU</span></div>
+        <div class="timer-dial-wrap">
+          <div class="timer-dial">
+            <svg viewBox="0 0 80 80">
+              <circle class="timer-track" cx="40" cy="40" r="34" fill="none" stroke-width="7"></circle>
+              <circle class="timer-fill" id="dial-p1" cx="40" cy="40" r="34" fill="none" stroke-width="7" stroke-dasharray="213.6" stroke-dashoffset="0"></circle>
+              <text x="40" y="45" text-anchor="middle" class="timer-num" transform="rotate(90 40 40)" id="dial-num-p1">2:00</text>
+            </svg>
+          </div>
+          <div class="stat-block">
+            <div class="time-value" id="time-p1">2:00</div>
+            <div class="counts" id="counts-p1">0 correct · 0 wrong</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="player-panel" id="panel-p2">
+        <div class="p-name"><span id="name-p2">Player 2</span><span class="you-tag" id="you-tag-p2" style="display:none;">YOU</span></div>
+        <div class="timer-dial-wrap">
+          <div class="timer-dial">
+            <svg viewBox="0 0 80 80">
+              <circle class="timer-track" cx="40" cy="40" r="34" fill="none" stroke-width="7"></circle>
+              <circle class="timer-fill" id="dial-p2" cx="40" cy="40" r="34" fill="none" stroke-width="7" stroke-dasharray="213.6" stroke-dashoffset="0"></circle>
+              <text x="40" y="45" text-anchor="middle" class="timer-num" transform="rotate(90 40 40)" id="dial-num-p2">2:00</text>
+            </svg>
+          </div>
+          <div class="stat-block">
+            <div class="time-value" id="time-p2">2:00</div>
+            <div class="counts" id="counts-p2">0 correct · 0 wrong</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <form class="guess-form" id="guess-form" autocomplete="off">
+      <input type="text" id="guess-input" placeholder="Name an animal…" autocomplete="off" disabled>
+      <button type="submit" class="btn btn-primary" id="guess-submit" disabled>Guess</button>
+    </form>
+    <div class="feedback-line" id="feedback"></div>
+
+    <div class="log-card">
+      <div class="log-title"><span>Field log</span><span id="log-count">0 specimens</span></div>
+      <ul class="log-list" id="log-list">
+        <li class="empty-log">No guesses yet — first correct animal starts the log.</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+<!-- Result overlay -->
+<div class="overlay" id="result-overlay" style="display:none;">
+  <div class="result-card">
+    <div class="eyebrow">expedition complete</div>
+    <h2 id="result-title">—</h2>
+    <div class="result-tally">
+      <div>
+        <div class="who" id="result-name-p1">Player 1</div>
+        <div class="score" id="result-score-p1">0</div>
+      </div>
+      <div>
+        <div class="who" id="result-name-p2">Player 2</div>
+        <div class="score" id="result-score-p2">0</div>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="rematch-btn">Back to home</button>
+  </div>
+</div>
+
+<script src="js/firebase-config.js"></script>
+<script type="module" src="js/firebase-init.js"></script>
+<script src="js/animals.js"></script>
+<script src="js/utils.js"></script>
+<script type="module" src="js/game.js"></script>
+</body>
+</html>
