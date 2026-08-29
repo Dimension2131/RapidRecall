@@ -103,7 +103,7 @@ function matchInSet(raw, set) {
  *  'nba' and 'soccer' draw from their own separate name dictionaries. */
 function matchForMode(raw, mode) {
   if (mode === 'nba') return matchInSet(raw, window.NBA_PLAYERS);
-  if (mode === 'soccer') return matchInSet(raw, window.SOCCER_PLAYERS);
+  if (mode === 'football') return matchInSet(raw, window.FOOTBALL_PLAYERS);
   return matchAnimal(raw);
 }
 
@@ -124,7 +124,7 @@ const MODE_LABELS = {
   dinosaurs: 'Dinosaurs only',
   letters: 'Letter-locked (rotates every 20s)',
   nba: 'NBA Players (all-time)',
-  soccer: 'Soccer Players (all-time)',
+  football: 'Football Players (all-time)',
 };
 
 // Deterministic per-round shuffle of A-Z, seeded from the match's start time
