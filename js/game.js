@@ -1,35 +1,3 @@
-// Gameplay: waiting room -> live duel -> result screen -> optional rematch.
-//
-// SCORING MODEL: running out of time locks a player out of guessing but does
-// NOT end the match by itself. The match ends once BOTH players are "done"
-// (out of time, or one forfeits by disconnecting). Whoever named more
-// correct entries wins; equal counts is a draw.
-//
-// TIMER MODEL: each player has {baseTime, baseTimestamp}. Effective time =
-// baseTime - (now - baseTimestamp)/1000. Every guess resets the anchor.
-//
-// STREAK MODEL: consecutive correct guesses within STREAK_WINDOW_S build a
-// streak that raises the bonus per correct guess (capped). A wrong guess
-// resets the streak; a duplicate or mode-mismatched guess leaves it alone.
-//
-// MODES: classic (any real animal), a category mode (mammals/birds/ocean/
-// dinosaurs, checked against js/categories.js), "letters" (must start
-// with whichever letter is currently active -- rotates every 20s, computed
-// deterministically from the match's startedAt so every client agrees
-// without needing to sync the rotation through the database), or a
-// player-name mode (nba/soccer, checked against their own separate
-// dictionaries in js/nba_players.js / js/soccer_players.js -- full name
-// required, no category/letter restriction layered on top).
-//
-// REMATCH / SERIES: after a match ends, both players vote. Once both vote
-// yes, a fresh round starts in the same lobby with the same settings, and a
-// running win/draw tally (the "series") persists across rounds. A player
-// declining ends the series.
-//
-// ADMIN: see admin.html / README for the (client-side-only) admin gate that
-// lets a signed-in admin spectate any lobby and overturn a log entry or
-// hand back time.
-
 const CORRECT_BONUS = 2;
 const WRONG_PENALTY = 5;
 const STREAK_WINDOW_S = 8;
@@ -93,14 +61,16 @@ const els = {
   rematchRowSpectator: document.getElementById('rematch-row-spectator'),
 };
 
-let mySlot = null;       // 'p1' | 'p2' | 'spectator' | 'admin'
+let mySlot = null;
 let myClientId = null;
 let lobbyRef = null;
 let latestLobby = null;
 let tickHandle = null;
 let myDoneReported = false;
 let disconnectTimer = null;
-let resultShownForFinishedAt = null; // avoid re-showing overlay repeatedly on every snapshot
+let resultShownForFinishedAt = null;
+let lastSeenStartedAt = null;
+
 
 els.codeEyebrow.textContent = CODE ? `#${CODE}` : '';
 
@@ -234,6 +204,10 @@ function attachLobbyListener() {
       return;
     }
     const lobby = snap.val();
+    if (lobby.startedAt !== lastSeenStartedAt) {
+      lastSeenStartedAt = lobby.startedAt;
+      myDoneReported = false;
+    }
     latestLobby = lobby;
     render(lobby);
     maybeStartGame(lobby);
@@ -253,14 +227,13 @@ function attachLobbyListener() {
   });
 
   els.guessForm.addEventListener('submit', onSubmitGuess);
-  // Mobile fix: tapping the submit button normally steals focus from the
-  // text input, which dismisses the on-screen keyboard between guesses.
-  // Blocking the button's own focus-grab (it still fires 'click'/'submit'
-  // fine) keeps the keyboard up so players can fire off guesses back-to-back
-  // without it popping closed and reopening every time.
   const preventFocusSteal = (e) => e.preventDefault();
   els.guessSubmit.addEventListener('mousedown', preventFocusSteal);
   els.guessSubmit.addEventListener('touchstart', preventFocusSteal, { passive: false });
+  els.guessSubmit.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  onSubmitGuess(e);
+  });
   els.rematchYesBtn.addEventListener('click', () => castRematchVote(true));
   els.rematchNoBtn.addEventListener('click', () => castRematchVote(false));
   els.rematchRowSpectator.addEventListener('click', () => { window.location.href = 'index.html'; });
