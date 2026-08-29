@@ -1,83 +1,137 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Libre+Franklin:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Manrope:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&display=swap');
+
+/* =========================================================
+   RAPID RECALL
+   ========================================================= */
 
 :root {
-  --paper: #ede6d3;
-  --paper-card: #f4efe1;
-  --paper-deep: #e1d6b8;
-  --ink: #22301f;
-  --ink-soft: #4a5643;
-  --forest: #2f4a34;
-  --forest-dark: #1f332a;
-  --brass: #b9862e;
-  --brass-light: #d9a94a;
-  --rust: #a13d2b;
-  --rust-light: #c1503a;
-  --line: rgba(34, 48, 31, 0.2);
-  --line-soft: rgba(34, 48, 31, 0.1);
-  --shadow: 0 1px 0 rgba(34,48,31,0.05), 0 8px 24px -12px rgba(34,48,31,0.35);
-  --radius: 4px;
+  /* Materials */
+  --paper: #1e211d;
+  --paper-card: #272b25;
+  --paper-deep: #30352e;
+
+  /* Type */
+  --ink: #e5e1d4;
+  --ink-soft: #a8aa9e;
+
+  /* Accent */
+  --forest: #6f8a68;
+  --forest-dark: #8fa486;
+
+  /* Brass */
+  --brass: #b99550;
+  --brass-light: #d0ad68;
+
+  /* Warning */
+  --rust: #b85a4b;
+  --rust-light: #d06b5b;
+
+  /* Lines */
+  --line: rgba(229, 225, 212, 0.14);
+  --line-soft: rgba(229, 225, 212, 0.07);
+
+  /* Depth */
+  --shadow:
+    0 1px 0 rgba(0, 0, 0, 0.15),
+    0 10px 30px -18px rgba(0, 0, 0, 0.7);
+
+  --radius: 5px;
 }
 
-* { box-sizing: border-box; }
 
-html, body {
+/* =========================================================
+   RESET
+   ========================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
 }
 
 body {
-  background:
-    radial-gradient(ellipse at top left, rgba(255,255,255,0.35), transparent 55%),
-    var(--paper);
-  background-attachment: fixed;
+  background: var(--paper);
   color: var(--ink);
-  font-family: 'Libre Franklin', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* faint paper grain via layered noise-ish gradients */
+/* Very subtle atmosphere — intentionally quiet. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background-image:
-    repeating-linear-gradient(0deg, rgba(34,48,31,0.015) 0px, transparent 1px, transparent 2px),
-    repeating-linear-gradient(90deg, rgba(34,48,31,0.01) 0px, transparent 1px, transparent 2px);
+  background:
+    radial-gradient(
+      circle at 50% -20%,
+      rgba(255, 255, 255, 0.035),
+      transparent 45%
+    );
   z-index: 0;
 }
 
-h1, h2, h3, .display {
-  font-family: 'Fraunces', serif;
-  font-weight: 600;
-  color: var(--forest-dark);
+
+/* =========================================================
+   TYPOGRAPHY
+   ========================================================= */
+
+h1,
+h2,
+h3,
+.display {
+  font-family: 'Newsreader', serif;
+  font-weight: 500;
+  color: var(--ink);
   margin: 0;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.025em;
 }
 
 .mono {
-  font-family: 'Space Mono', monospace;
+  font-family: 'Fira Code', monospace;
 }
 
-a { color: inherit; }
+a {
+  color: inherit;
+  text-decoration-color: rgba(229, 225, 212, 0.3);
+  text-underline-offset: 3px;
+  transition:
+    color 0.15s ease,
+    text-decoration-color 0.15s ease;
+}
+
+a:hover {
+  color: var(--brass-light);
+  text-decoration-color: var(--brass);
+}
 
 button {
   font-family: inherit;
   cursor: pointer;
 }
 
-/* ---------- layout shells ---------- */
+
+/* =========================================================
+   LAYOUT
+   ========================================================= */
 
 .page {
   position: relative;
   z-index: 1;
   min-height: 100vh;
+
   display: flex;
   flex-direction: column;
   align-items: center;
+
   padding: 32px 20px 60px;
 }
 
@@ -89,153 +143,235 @@ button {
 }
 
 .masthead .eyebrow {
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
-  letter-spacing: 0.16em;
+  font-family: 'Fira Code', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  line-height: 1.4;
   text-transform: uppercase;
   color: var(--ink-soft);
-  margin-bottom: 10px;
+  opacity: 0.8;
+  margin-bottom: 12px;
 }
 
 .masthead .eyebrow::before,
 .masthead .eyebrow::after {
-  content: "\2022\2022\2022";
-  color: var(--brass);
-  margin: 0 10px;
-  letter-spacing: 3px;
+  content: none;
 }
 
 .masthead h1 {
-  font-size: clamp(32px, 6vw, 48px);
-  line-height: 1.05;
+  font-size: clamp(38px, 7vw, 54px);
+  line-height: 0.98;
+  font-weight: 500;
 }
 
 .masthead .sub {
-  margin-top: 10px;
+  max-width: 570px;
+  margin: 12px auto 0;
   color: var(--ink-soft);
-  font-size: 15px;
+  font-size: 14px;
+  line-height: 1.65;
 }
+
+
+/* =========================================================
+   CARDS
+   ========================================================= */
 
 .card {
   width: 100%;
   max-width: 480px;
+
   background: var(--paper-card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
+
   box-shadow: var(--shadow);
+
   padding: 28px;
   position: relative;
 }
 
-.card + .card { margin-top: 18px; }
+.card + .card {
+  margin-top: 18px;
+}
 
+/* Quiet inner border retained from the original design. */
 .card::before {
   content: "";
   position: absolute;
-  top: 10px; left: 10px; right: 10px; bottom: 10px;
+  inset: 10px;
+
   border: 1px solid var(--line-soft);
-  border-radius: 2px;
+  border-radius: 3px;
+
   pointer-events: none;
 }
 
+
+/* =========================================================
+   FORM ELEMENTS
+   ========================================================= */
+
 .field-label {
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.1em;
+  font-family: 'Fira Code', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--brass);
+
   display: block;
   margin-bottom: 8px;
 }
 
-input[type="text"] {
+input[type="text"],
+input[type="password"] {
   width: 100%;
-  font-family: 'Libre Franklin', sans-serif;
+
+  font-family: 'Manrope', sans-serif;
   font-size: 16px;
+
   padding: 12px 14px;
+
   border: 1px solid var(--line);
+  border-radius: 3px;
+
   background: var(--paper);
   color: var(--ink);
-  border-radius: 3px;
+
   outline: none;
-  transition: border-color .15s ease, background .15s ease;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
-input[type="text"]:focus {
+input[type="text"]::placeholder,
+input[type="password"]::placeholder {
+  color: var(--ink-soft);
+  opacity: 0.65;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus {
   border-color: var(--brass);
-  background: #fffdf7;
+  background: #22261f;
+  box-shadow: 0 0 0 3px rgba(185, 149, 80, 0.09);
 }
 
 input[type="text"].mono {
+  font-family: 'Fira Code', monospace;
   letter-spacing: 0.3em;
   text-align: center;
   font-size: 22px;
-  text-transform: uppercase;
 }
+
+.guess-form input {
+  min-height: 50px;
+  font-size: 16px;
+}
+
+.guess-form input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: var(--paper-deep);
+}
+
+.error-msg {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--rust);
+  min-height: 18px;
+}
+
+.hint {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-top: 10px;
+}
+
+
+/* =========================================================
+   BUTTONS
+   ========================================================= */
 
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+
   width: 100%;
-  padding: 13px 18px;
+  min-height: 44px;
+
+  padding: 11px 18px;
+
   border-radius: 3px;
   border: 1px solid transparent;
+
   font-weight: 600;
-  font-size: 15px;
-  letter-spacing: 0.01em;
-  transition: transform .08s ease, box-shadow .15s ease, background .15s ease, opacity .15s ease;
+  font-size: 14px;
+  letter-spacing: 0.005em;
+
+  transition:
+    transform 0.08s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
 }
 
-.btn:active { transform: translateY(1px); }
+.btn:active {
+  transform: translateY(1px);
+}
 
 .btn-primary {
-  background: var(--forest);
-  color: var(--paper-card);
+  background: #3d5948;
+  color: #eee9dc;
+  border-color: #3d5948;
 }
-.btn-primary:hover { background: var(--forest-dark); }
-.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary:hover {
+  background: #486552;
+  border-color: #486552;
+  box-shadow: 0 4px 14px -10px rgba(111, 138, 104, 0.8);
+}
+
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
 
 .btn-secondary {
   background: transparent;
-  color: var(--forest-dark);
+  color: var(--ink);
   border-color: var(--line);
 }
-.btn-secondary:hover { border-color: var(--forest); background: rgba(47,74,52,0.06); }
 
-.divider-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 22px 0;
-  color: var(--ink-soft);
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-.divider-row::before, .divider-row::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--line);
+.btn-secondary:hover {
+  background: rgba(229, 225, 212, 0.045);
+  border-color: rgba(229, 225, 212, 0.25);
 }
 
-.error-msg {
-  margin-top: 10px;
-  font-size: 13.5px;
-  color: var(--rust);
-  min-height: 18px;
+
+/* =========================================================
+   ACCESSIBILITY
+   ========================================================= */
+
+button:focus-visible,
+input:focus-visible,
+a:focus-visible,
+.mode-option:has(input:focus-visible),
+.clock-option:has(input:focus-visible) {
+  outline: 2px solid var(--brass);
+  outline-offset: 3px;
 }
 
-.hint {
-  font-size: 13px;
-  color: var(--ink-soft);
-  margin-top: 10px;
-}
 
-/* ---------- waiting room ---------- */
+/* =========================================================
+   WAITING ROOM
+   ========================================================= */
 
 .code-plate {
   text-align: center;
@@ -243,15 +379,18 @@ input[type="text"].mono {
 }
 
 .code-plate .code-value {
-  font-family: 'Space Mono', monospace;
-  font-size: clamp(36px, 9vw, 52px);
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  color: var(--forest-dark);
-  border: 2px dashed var(--brass);
+  font-family: 'Fira Code', monospace;
+  font-size: clamp(34px, 9vw, 50px);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--ink);
+
+  border: 1px dashed var(--brass);
   border-radius: 4px;
+
   padding: 14px 10px;
-  background: repeating-linear-gradient(135deg, rgba(185,134,46,0.05) 0 10px, transparent 10px 20px);
+
+  background: rgba(185, 149, 80, 0.035);
 }
 
 .copy-row {
@@ -265,72 +404,115 @@ input[type="text"].mono {
   align-items: center;
   justify-content: center;
   gap: 10px;
+
   margin-top: 22px;
+
   color: var(--ink-soft);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .dot-pulse {
-  width: 8px; height: 8px; border-radius: 50%;
+  width: 7px;
+  height: 7px;
+
+  border-radius: 50%;
   background: var(--brass);
-  animation: pulse 1.1s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%, 100% { transform: scale(0.7); opacity: 0.5; }
-  50% { transform: scale(1); opacity: 1; }
+
+  animation: pulse 1.4s ease-in-out infinite;
 }
 
-/* ---------- game screen ---------- */
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(0.75);
+    opacity: 0.45;
+  }
+
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+
+/* =========================================================
+   GAME
+   ========================================================= */
 
 .game-wrap {
   width: 100%;
-  max-width: 880px;
+  max-width: 960px;
 }
 
 .players-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+
   margin-bottom: 22px;
 }
 
 .player-panel {
-  background: var(--paper-card);
+  background: #252923;
+
   border: 1px solid var(--line);
   border-radius: var(--radius);
+
   padding: 18px 16px;
+
   position: relative;
   overflow: hidden;
+
+  box-shadow: var(--shadow);
 }
 
-.player-panel.is-you { border-color: var(--brass); box-shadow: 0 0 0 1px var(--brass) inset; }
-.player-panel.disconnected { opacity: 0.55; }
+.player-panel.is-you {
+  border-color: rgba(185, 149, 80, 0.75);
+
+  box-shadow:
+    0 0 0 1px rgba(185, 149, 80, 0.35) inset,
+    0 8px 24px -18px rgba(185, 149, 80, 0.7);
+}
+
+.player-panel.disconnected {
+  opacity: 0.55;
+}
 
 .player-panel .p-name {
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
-  letter-spacing: 0.08em;
+  font-family: 'Fira Code', monospace;
+  font-size: 10px;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
+
   color: var(--ink-soft);
+
   display: flex;
   justify-content: space-between;
   align-items: center;
+
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .you-tag {
   background: var(--brass);
-  color: #2a1c04;
-  font-size: 10px;
+  color: #211b10;
+
+  font-size: 9px;
+  font-weight: 600;
+
   padding: 2px 6px;
   border-radius: 2px;
-  letter-spacing: 0.05em;
+
+  letter-spacing: 0.06em;
 }
 
 .timer-dial-wrap {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-top: 12px;
+
+  margin-top: 14px;
 }
 
 .timer-dial {
@@ -339,35 +521,110 @@ input[type="text"].mono {
   flex-shrink: 0;
 }
 
-.timer-dial svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-.timer-track { stroke: var(--line); }
+.timer-dial svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.timer-track {
+  stroke: rgba(229, 225, 212, 0.1);
+}
+
 .timer-fill {
   stroke: var(--brass);
-  transition: stroke-dashoffset 0.25s linear, stroke 0.3s ease;
+
+  transition:
+    stroke-dashoffset 0.25s linear,
+    stroke 0.3s ease;
+
   stroke-linecap: round;
 }
-.timer-fill.low { stroke: var(--rust); }
+
+.timer-fill.low {
+  stroke: var(--rust);
+}
 
 .timer-num {
-  font-family: 'Space Mono', monospace;
-  font-size: 15px;
-  font-weight: 700;
+  font-family: 'Fira Code', monospace;
+  font-size: 14px;
+  font-weight: 600;
   fill: var(--ink);
 }
 
 .stat-block .time-value {
-  font-family: 'Fraunces', serif;
-  font-size: 28px;
+  font-family: 'Newsreader', serif;
+  font-size: 29px;
+  line-height: 1;
+
   font-weight: 600;
-  color: var(--forest-dark);
+  color: var(--ink);
 }
-.stat-block .time-value.low { color: var(--rust); }
+
+.stat-block .time-value.low {
+  color: var(--rust);
+}
 
 .stat-block .counts {
-  margin-top: 4px;
-  font-size: 12.5px;
+  margin-top: 5px;
+  font-size: 11.5px;
   color: var(--ink-soft);
 }
+
+
+/* =========================================================
+   ADMIN CONTROLS
+   ========================================================= */
+
+.admin-only {
+  display: none;
+}
+
+body.is-admin .admin-only {
+  display: flex;
+}
+
+.admin-time-row {
+  margin-top: 8px;
+  gap: 6px;
+}
+
+.admin-mini-btn {
+  font-family: 'Fira Code', monospace;
+  font-size: 10px;
+
+  padding: 3px 8px;
+
+  border-radius: 3px;
+  border: 1px solid rgba(185, 149, 80, 0.6);
+
+  background: rgba(185, 149, 80, 0.08);
+  color: var(--brass-light);
+
+  cursor: pointer;
+  margin-left: 8px;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.admin-mini-btn:hover {
+  background: rgba(185, 149, 80, 0.15);
+  border-color: var(--brass);
+}
+
+.log-overturned {
+  font-family: 'Fira Code', monospace;
+  font-size: 9px;
+  color: var(--brass);
+  text-transform: uppercase;
+}
+
+
+/* =========================================================
+   GUESS FORM
+   ========================================================= */
 
 .guess-form {
   display: flex;
@@ -381,280 +638,551 @@ input[type="text"].mono {
 
 .guess-form .btn {
   width: auto;
+  min-height: 50px;
   padding: 0 22px;
 }
 
 .feedback-line {
   min-height: 22px;
-  font-size: 13.5px;
+
+  font-size: 13px;
   font-weight: 600;
+
   margin-bottom: 18px;
 }
-.feedback-line.correct { color: var(--forest); }
-.feedback-line.wrong { color: var(--rust); }
-.feedback-line.dup { color: var(--brass); }
+
+.feedback-line.correct {
+  color: var(--forest-dark);
+}
+
+.feedback-line.wrong {
+  color: var(--rust);
+}
+
+.feedback-line.dup {
+  color: var(--brass);
+}
+
+
+/* =========================================================
+   GUESS LOG
+   ========================================================= */
 
 .log-card {
-  background: var(--paper-card);
+  background: #252923;
+
   border: 1px solid var(--line);
   border-radius: var(--radius);
+
   padding: 18px 20px;
+
+  box-shadow: var(--shadow);
 }
 
 .log-title {
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
+  font-family: 'Fira Code', monospace;
+  font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+
   color: var(--ink-soft);
+
   margin-bottom: 12px;
+
   display: flex;
   justify-content: space-between;
 }
 
 .log-list {
   list-style: none;
+
   margin: 0;
   padding: 0;
+
   max-height: 260px;
   overflow-y: auto;
+
   display: flex;
   flex-direction: column-reverse;
+
+  scrollbar-width: thin;
+  scrollbar-color: var(--paper-deep) transparent;
+}
+
+.log-list::-webkit-scrollbar {
+  width: 7px;
+}
+
+.log-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.log-list::-webkit-scrollbar-thumb {
+  background: var(--paper-deep);
+  border-radius: 10px;
+}
+
+.log-list::-webkit-scrollbar-thumb:hover {
+  background: var(--brass);
 }
 
 .log-list li {
   display: flex;
   align-items: baseline;
   gap: 10px;
+
   padding: 7px 0;
+
   border-bottom: 1px dashed var(--line-soft);
-  font-size: 14px;
+
+  font-size: 13px;
+
+  transition: background 0.15s ease;
 }
-.log-list li:first-child { border-bottom: none; }
+
+.log-list li:first-child {
+  border-bottom: none;
+}
+
+.log-list li:hover {
+  background: rgba(229, 225, 212, 0.025);
+}
 
 .log-tag {
-  font-family: 'Space Mono', monospace;
-  font-size: 10px;
+  font-family: 'Fira Code', monospace;
+  font-size: 9px;
+
   padding: 2px 6px;
+
   border-radius: 2px;
+
   flex-shrink: 0;
   text-transform: uppercase;
 }
-.log-tag.p1 { background: rgba(47,74,52,0.15); color: var(--forest-dark); }
-.log-tag.p2 { background: rgba(185,134,46,0.2); color: #6b4a15; }
 
-.log-word { flex: 1; text-transform: capitalize; }
-.log-word.wrongword { text-decoration: line-through; color: var(--ink-soft); text-transform: none; }
-.log-delta { font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; }
-.log-delta.pos { color: var(--forest); }
-.log-delta.neg { color: var(--rust); }
+.log-tag.p1 {
+  background: rgba(111, 138, 104, 0.14);
+  color: var(--forest-dark);
+}
+
+.log-tag.p2 {
+  background: rgba(185, 149, 80, 0.14);
+  color: var(--brass-light);
+}
+
+.log-word {
+  flex: 1;
+  text-transform: capitalize;
+}
+
+.log-word.wrongword {
+  text-decoration: line-through;
+  color: var(--ink-soft);
+  text-transform: none;
+}
+
+.log-delta {
+  font-family: 'Fira Code', monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.log-delta.pos {
+  color: var(--forest-dark);
+}
+
+.log-delta.neg {
+  color: var(--rust);
+}
 
 .empty-log {
   color: var(--ink-soft);
-  font-size: 13.5px;
+  font-size: 12.5px;
   font-style: italic;
   padding: 6px 0;
 }
 
-/* ---------- admin & spectator ---------- */
 
-.admin-only { display: none; }
-body.is-admin .admin-only { display: flex; }
+/* =========================================================
+   GAME SETUP
+   ========================================================= */
 
-.admin-time-row {
-  margin-top: 8px;
-  gap: 6px;
-}
-
-.admin-mini-btn {
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  padding: 3px 8px;
-  border-radius: 3px;
-  border: 1px solid var(--brass);
-  background: rgba(185,134,46,0.12);
-  color: #6b4a15;
-  cursor: pointer;
-  margin-left: 8px;
-}
-.admin-mini-btn:hover { background: rgba(185,134,46,0.25); }
-
-.log-overturned {
-  font-family: 'Space Mono', monospace;
-  font-size: 10px;
-  color: var(--brass);
-  text-transform: uppercase;
-}
-
-/* ---------- game setup (mode + clock picker) ---------- */
-
-.mode-options, .clock-options {
+.mode-options,
+.clock-options {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.clock-options { flex-direction: row; flex-wrap: wrap; }
 
-.mode-option, .clock-option {
+.clock-options {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.mode-option,
+.clock-option {
   display: flex;
   align-items: center;
   gap: 10px;
+
   padding: 10px 12px;
+
   border: 1px solid var(--line);
   border-radius: 3px;
+
   background: var(--paper);
+
   cursor: pointer;
-  font-size: 14px;
-  transition: border-color .12s ease, background .12s ease;
-}
-.clock-option { flex: 1; justify-content: center; min-width: 64px; }
 
-.mode-option:has(input:checked), .clock-option:has(input:checked) {
-  border-color: var(--brass);
-  background: rgba(185,134,46,0.1);
+  font-size: 13px;
+
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
-.mode-option input, .clock-option input { accent-color: var(--brass); }
-.mode-option em, .clock-option em { font-style: normal; color: var(--ink-soft); font-size: 12.5px; }
+.clock-option {
+  flex: 1 1 0;
+  justify-content: center;
+  min-width: 70px;
+}
+
+.mode-option:hover,
+.clock-option:hover {
+  border-color: rgba(229, 225, 212, 0.25);
+}
+
+.mode-option:has(input:checked),
+.clock-option:has(input:checked) {
+  border-color: rgba(185, 149, 80, 0.75);
+  background: rgba(185, 149, 80, 0.08);
+  box-shadow: inset 3px 0 0 var(--brass);
+}
+
+.clock-option:has(input:checked) {
+  box-shadow: inset 0 -2px 0 var(--brass);
+}
+
+.mode-option input,
+.clock-option input {
+  accent-color: var(--brass);
+}
+
+.mode-option em,
+.clock-option em {
+  font-style: normal;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
 
 .mode-badge {
   display: inline-block;
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.06em;
+
+  font-family: 'Fira Code', monospace;
+  font-size: 9px;
+
+  letter-spacing: 0.07em;
   text-transform: uppercase;
+
   color: var(--forest-dark);
-  background: rgba(47,74,52,0.1);
+
+  background: rgba(111, 138, 104, 0.08);
+
   border: 1px solid var(--line);
+
   border-radius: 3px;
+
   padding: 4px 10px;
-  margin-top: 6px;
+  margin-top: 7px;
 }
 
-/* ---------- letter-round banner ---------- */
+
+/* =========================================================
+   LETTER ROUND
+   ========================================================= */
 
 .letter-banner {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
+
   margin: 4px 0 18px;
   padding: 10px 16px;
+
   background: var(--paper-card);
-  border: 1px solid var(--brass);
+
+  border: 1px solid rgba(185, 149, 80, 0.55);
   border-radius: 4px;
-  font-family: 'Space Mono', monospace;
-  font-size: 13px;
+
+  font-family: 'Fira Code', monospace;
+  font-size: 12px;
 }
+
 .letter-banner .letter-big {
-  font-family: 'Fraunces', serif;
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--brass);
+  font-family: 'Newsreader', serif;
+  font-size: 28px;
+  font-weight: 600;
+
+  color: var(--brass-light);
   line-height: 1;
 }
 
+
+/* =========================================================
+   SUDDEN DEATH
+   ========================================================= */
+
 .sudden-death-banner {
   text-align: center;
+
   margin: 4px 0 18px;
   padding: 10px 16px;
-  background: rgba(161,61,43,0.12);
-  border: 1px solid var(--rust);
+
+  background: rgba(184, 90, 75, 0.08);
+
+  border: 1px solid rgba(184, 90, 75, 0.55);
   border-radius: 4px;
-  color: var(--rust);
-  font-family: 'Space Mono', monospace;
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  animation: sd-pulse 1.4s ease-in-out infinite;
-}
-@keyframes sd-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.65; }
+
+  color: var(--rust-light);
+
+  font-family: 'Fira Code', monospace;
+  font-size: 11px;
+  font-weight: 600;
+
+  letter-spacing: 0.015em;
 }
 
-/* ---------- rematch / series ---------- */
+
+/* =========================================================
+   REMATCH / SERIES
+   ========================================================= */
 
 .series-row {
   display: flex;
   justify-content: center;
   gap: 18px;
+
   margin: 4px 0 20px;
-  font-family: 'Space Mono', monospace;
-  font-size: 13px;
+
+  font-family: 'Fira Code', monospace;
+  font-size: 12px;
+
   color: var(--ink-soft);
 }
-.series-row strong { color: var(--forest-dark); }
+
+.series-row strong {
+  color: var(--ink);
+}
 
 .rematch-row {
   display: flex;
   flex-direction: column;
   gap: 10px;
+
   margin-top: 8px;
 }
+
 .rematch-status {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--ink-soft);
   min-height: 16px;
 }
 
-/* ---------- result overlay ---------- */
+
+/* =========================================================
+   RESULT OVERLAY
+   ========================================================= */
 
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(31, 41, 26, 0.55);
-  backdrop-filter: blur(2px);
+
+  background: rgba(12, 15, 12, 0.72);
+
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+
   display: flex;
   align-items: center;
   justify-content: center;
+
   z-index: 10;
   padding: 20px;
 }
 
 .result-card {
   background: var(--paper-card);
+
   border: 1px solid var(--line);
   border-radius: 6px;
+
   max-width: 420px;
   width: 100%;
+
   padding: 34px 30px;
+
   text-align: center;
-  box-shadow: 0 20px 60px -20px rgba(0,0,0,0.5);
+
+  box-shadow:
+    0 20px 60px -20px rgba(0, 0, 0, 0.75);
+
+  animation: result-enter 0.22s ease-out;
+}
+
+@keyframes result-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .result-card .eyebrow {
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
+  font-family: 'Fira Code', monospace;
+  font-size: 10px;
+
   letter-spacing: 0.14em;
   text-transform: uppercase;
+
   color: var(--brass);
+
   margin-bottom: 10px;
 }
 
 .result-card h2 {
-  font-size: 32px;
+  font-size: 34px;
+  line-height: 1;
   margin-bottom: 18px;
 }
 
 .result-tally {
   display: flex;
   justify-content: space-around;
+
   margin: 20px 0 26px;
-  font-family: 'Space Mono', monospace;
+
+  font-family: 'Fira Code', monospace;
 }
 
-.result-tally .who { font-size: 12px; color: var(--ink-soft); text-transform: uppercase; margin-bottom: 4px; }
-.result-tally .score { font-size: 26px; font-weight: 700; color: var(--forest-dark); }
+.result-tally .who {
+  font-size: 10px;
+  color: var(--ink-soft);
+
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+
+  margin-bottom: 4px;
+}
+
+.result-tally .score {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
 
 @media (max-width: 560px) {
-  .players-row { grid-template-columns: 1fr; }
-  .card { padding: 22px; }
+  .page {
+    padding: 24px 14px 40px;
+  }
+
+  .masthead {
+    margin-bottom: 22px;
+  }
+
+  .masthead .sub {
+    font-size: 13.5px;
+  }
+
+  .players-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .card {
+    padding: 22px;
+  }
+
+  .guess-form {
+    gap: 7px;
+  }
+
+  .guess-form .btn {
+    padding: 0 16px;
+  }
+
+  .result-card {
+    padding: 28px 22px;
+  }
 }
+
+@media (max-width: 420px) {
+  .guess-form {
+    flex-direction: column;
+  }
+
+  .guess-form .btn {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  .copy-row {
+    flex-direction: column;
+  }
+
+  .result-card h2 {
+    font-size: 30px;
+  }
+}
+
+@media (max-width: 380px) {
+  .clock-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .masthead h1 {
+    font-size: 36px;
+  }
+}
+
+
+/* =========================================================
+   REDUCED MOTION
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
+/* =========================================================
+   VISUALLY HIDDEN
+   ========================================================= */
 
 .visually-hidden {
   position: absolute;
-  width: 1px; height: 1px;
+  width: 1px;
+  height: 1px;
+
   overflow: hidden;
+
   clip: rect(0 0 0 0);
 }
