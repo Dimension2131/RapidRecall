@@ -12,20 +12,22 @@
   <div class="masthead">
     <div class="eyebrow">lobby <span id="code-eyebrow" class="mono"></span></div>
     <h1 id="masthead-title">Fauna Duel</h1>
+    <div class="mode-badge" id="mode-badge" style="display:none;"></div>
   </div>
 
   <!-- Shown only if this browser wasn't the one that created/joined via the home page
-       (e.g. someone opened a shared link directly). -->
+       (e.g. someone opened a shared link directly) and a player slot is still open. -->
   <div class="card" id="join-panel" style="display:none;">
     <label class="field-label" for="join-username">Your name</label>
     <input type="text" id="join-username" maxlength="18" placeholder="e.g. Wren" autocomplete="off">
     <div class="error-msg" id="join-panel-error"></div>
     <button class="btn btn-primary" id="join-panel-btn" style="margin-top:12px;">Join this lobby</button>
+    <p class="hint">If both seats are already taken, you'll join as a spectator instead.</p>
   </div>
 
   <!-- Waiting room -->
   <div class="card" id="waiting-panel" style="display:none;">
-    <label class="field-label">Share this code with the other explorer</label>
+    <label class="field-label">Share this code with your opponent</label>
     <div class="code-plate">
       <div class="code-value" id="waiting-code">------</div>
     </div>
@@ -36,10 +38,16 @@
     <div class="spinner-row">
       <div class="dot-pulse"></div> Waiting for opponent to join…
     </div>
+    <p class="hint">Anyone else who enters this code once the duel starts will join as a spectator.</p>
   </div>
 
   <!-- Main game -->
   <div class="game-wrap" id="game-panel" style="display:none;">
+
+    <div class="letter-banner" id="letter-banner" style="display:none;">
+      Current letter: <span class="letter-big" id="letter-current">A</span>
+      <span id="letter-countdown">(20s)</span>
+    </div>
 
     <div class="players-row">
       <div class="player-panel" id="panel-p1">
@@ -55,6 +63,10 @@
           <div class="stat-block">
             <div class="time-value" id="time-p1">2:00</div>
             <div class="counts" id="counts-p1">0 correct · 0 wrong</div>
+            <div class="admin-time-row admin-only" id="admin-time-p1">
+              <button type="button" class="admin-mini-btn admin-minus">−5s</button>
+              <button type="button" class="admin-mini-btn admin-plus">+5s</button>
+            </div>
           </div>
         </div>
       </div>
@@ -72,10 +84,16 @@
           <div class="stat-block">
             <div class="time-value" id="time-p2">2:00</div>
             <div class="counts" id="counts-p2">0 correct · 0 wrong</div>
+            <div class="admin-time-row admin-only" id="admin-time-p2">
+              <button type="button" class="admin-mini-btn admin-minus">−5s</button>
+              <button type="button" class="admin-mini-btn admin-plus">+5s</button>
+            </div>
           </div>
         </div>
       </div>
     </div>
+
+    <p class="hint" id="spectate-note" style="display:none;"></p>
 
     <form class="guess-form" id="guess-form" autocomplete="off">
       <input type="text" id="guess-input" placeholder="Name an animal…" autocomplete="off" disabled>
@@ -84,7 +102,7 @@
     <div class="feedback-line" id="feedback"></div>
 
     <div class="log-card">
-      <div class="log-title"><span>Field log</span><span id="log-count">0 specimens</span></div>
+      <div class="log-title"><span>Animal Log</span><span id="log-count">0 specimens</span></div>
       <ul class="log-list" id="log-list">
         <li class="empty-log">No guesses yet — first correct animal starts the log.</li>
       </ul>
@@ -96,8 +114,9 @@
 <!-- Result overlay -->
 <div class="overlay" id="result-overlay" style="display:none;">
   <div class="result-card">
-    <div class="eyebrow">expedition complete</div>
+    <div class="eyebrow">Game Over</div>
     <h2 id="result-title">—</h2>
+    <p class="hint" id="result-sub" style="margin-top:-6px;"></p>
     <div class="result-tally">
       <div>
         <div class="who" id="result-name-p1">Player 1</div>
@@ -108,13 +127,20 @@
         <div class="score" id="result-score-p2">0</div>
       </div>
     </div>
-    <button class="btn btn-primary" id="rematch-btn">Back to home</button>
+    <div class="series-row" id="series-row"></div>
+    <div class="rematch-row" id="rematch-row-player" style="display:none;">
+      <button class="btn btn-primary" id="rematch-yes-btn">Rematch</button>
+      <button class="btn btn-secondary" id="rematch-no-btn">Back to home</button>
+      <div class="rematch-status" id="rematch-status"></div>
+    </div>
+    <button class="btn btn-primary" id="rematch-row-spectator" style="display:none;">Back to home</button>
   </div>
 </div>
 
 <script src="js/firebase-config.js"></script>
 <script type="module" src="js/firebase-init.js"></script>
 <script src="js/animals.js"></script>
+<script src="js/categories.js"></script>
 <script src="js/utils.js"></script>
 <script type="module" src="js/game.js"></script>
 </body>

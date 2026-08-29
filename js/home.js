@@ -6,6 +6,10 @@ function fb() { return window.__fb; }
 const usernameEl = document.getElementById('username');
 const nameErrorEl = document.getElementById('name-error');
 const createBtn = document.getElementById('create-btn');
+const setupPanel = document.getElementById('setup-panel');
+const setupErrorEl = document.getElementById('setup-error');
+const setupConfirmBtn = document.getElementById('setup-confirm-btn');
+const setupBackBtn = document.getElementById('setup-back-btn');
 const joinCodeEl = document.getElementById('join-code');
 const joinErrorEl = document.getElementById('join-error');
 const joinBtn = document.getElementById('join-btn');
@@ -46,11 +50,26 @@ async function findFreeCode() {
   throw new Error('Could not allocate a lobby code, please try again.');
 }
 
-createBtn.addEventListener('click', async () => {
+createBtn.addEventListener('click', () => {
   const name = requireUsername();
   if (!name) return;
-  createBtn.disabled = true;
-  createBtn.textContent = 'Creating…';
+  createBtn.parentElement.style.display = 'none';
+  setupPanel.style.display = 'block';
+});
+
+setupBackBtn.addEventListener('click', () => {
+  setupPanel.style.display = 'none';
+  createBtn.parentElement.style.display = 'block';
+});
+
+setupConfirmBtn.addEventListener('click', async () => {
+  const name = requireUsername();
+  if (!name) return;
+  const mode = document.querySelector('input[name="mode"]:checked')?.value || 'classic';
+  const clockSeconds = parseInt(document.querySelector('input[name="clock"]:checked')?.value || '120', 10);
+
+  setupConfirmBtn.disabled = true;
+  setupConfirmBtn.textContent = 'Creating…';
   try {
     const { db, ref, set, serverTimestamp } = fb();
     const code = await findFreeCode();
@@ -61,24 +80,23 @@ createBtn.addEventListener('click', async () => {
       winner: null,
       usedAnimals: {},
       log: {},
+      settings: { mode, clockSeconds },
+      series: { wins: { p1: 0, p2: 0 }, draws: 0, round: 1 },
       players: {
-        p1: {
-          name, clientId, connected: true,
-          time: 120, correct: 0, wrong: 0
-        }
+        p1: { name, clientId, connected: true, correct: 0, wrong: 0 }
       }
     });
     localStorage.setItem('aw_last_lobby', JSON.stringify({ code, slot: 'p1' }));
     window.location.href = `game.html?code=${code}`;
   } catch (err) {
     console.error(err);
-    nameErrorEl.textContent = 'Could not create a lobby. Check your Firebase setup / connection.';
-    createBtn.disabled = false;
-    createBtn.textContent = 'Create lobby';
+    setupErrorEl.textContent = 'Could not create a lobby. Check your Firebase setup / connection.';
+    setupConfirmBtn.disabled = false;
+    setupConfirmBtn.textContent = 'Create lobby & get code';
   }
 });
 
-joinBtn.addEventListener('click', async () => {
+joinBtn.addEventListener('click', () => {
   const name = requireUsername();
   if (!name) return;
   const code = joinCodeEl.value.trim();
@@ -87,62 +105,10 @@ joinBtn.addEventListener('click', async () => {
     return;
   }
   joinErrorEl.textContent = '';
-  joinBtn.disabled = true;
-  joinBtn.textContent = 'Joining…';
-  try {
-    const { db, ref, get, runTransaction } = fb();
-    const lobbyRef = ref(db, 'lobbies/' + code);
-    const snap = await get(lobbyRef);
-    if (!snap.exists()) {
-      joinErrorEl.textContent = 'No lobby found with that code.';
-      joinBtn.disabled = false;
-      joinBtn.textContent = 'Join lobby';
-      return;
-    }
-    const lobby = snap.val();
-    const clientId = getClientId();
-
-    // Already part of this lobby (refresh / rejoin case)
-    if (lobby.players?.p1?.clientId === clientId) {
-      localStorage.setItem('aw_last_lobby', JSON.stringify({ code, slot: 'p1' }));
-      window.location.href = `game.html?code=${code}`;
-      return;
-    }
-    if (lobby.players?.p2?.clientId === clientId) {
-      localStorage.setItem('aw_last_lobby', JSON.stringify({ code, slot: 'p2' }));
-      window.location.href = `game.html?code=${code}`;
-      return;
-    }
-
-    if (lobby.players?.p1 && lobby.players?.p2) {
-      joinErrorEl.textContent = 'That lobby already has two players.';
-      joinBtn.disabled = false;
-      joinBtn.textContent = 'Join lobby';
-      return;
-    }
-
-    // Claim the p2 slot atomically so two simultaneous joiners can't collide.
-    const p2Ref = ref(db, `lobbies/${code}/players/p2`);
-    const result = await runTransaction(p2Ref, (current) => {
-      if (current) return; // already taken, abort
-      return { name, clientId, connected: true, time: 120, correct: 0, wrong: 0 };
-    });
-
-    if (!result.committed) {
-      joinErrorEl.textContent = 'That lobby already has two players.';
-      joinBtn.disabled = false;
-      joinBtn.textContent = 'Join lobby';
-      return;
-    }
-
-    localStorage.setItem('aw_last_lobby', JSON.stringify({ code, slot: 'p2' }));
-    window.location.href = `game.html?code=${code}`;
-  } catch (err) {
-    console.error(err);
-    joinErrorEl.textContent = 'Could not join. Check your Firebase setup / connection.';
-    joinBtn.disabled = false;
-    joinBtn.textContent = 'Join lobby';
-  }
+  // All slot/spectator resolution happens on game.html itself, so a
+  // reconnect or a spectate-fallback works the same whether someone
+  // arrives from this button or opens a shared link directly.
+  window.location.href = `game.html?code=${code}`;
 });
 
 usernameEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') createBtn.click(); });

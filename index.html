@@ -3,28 +3,53 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fauna Duel - Animal Guessing Race</title>
+<title>Fauna Duel — animal guessing race</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div class="page">
 
   <div class="masthead">
-    <div class="eyebrow">·</div>
+    <div class="eyebrow">· two player game ·</div>
     <h1>Fauna Duel</h1>
     <p class="sub">Name real animals faster than your opponent. Every correct call buys you time — every miss costs you five seconds.</p>
   </div>
 
   <div class="card">
     <label class="field-label" for="username">Your name</label>
-    <input type="text" id="username" maxlength="18" placeholder="e.g. Wren" autocomplete="off">
+    <input type="text" id="username" maxlength="18" placeholder="e.g. User" autocomplete="off">
     <div class="error-msg" id="name-error"></div>
   </div>
 
   <div class="card">
     <label class="field-label">Start a lobby</label>
-    <p class="hint" style="margin-top:0;margin-bottom:14px;">Creates a 6-digit code for one other player to join.</p>
+    <p class="hint" style="margin-top:0;margin-bottom:14px;">Choose a mode and clock length, then get a 6-digit code for one other player to join.</p>
     <button class="btn btn-primary" id="create-btn">Create lobby</button>
+  </div>
+
+  <!-- Game setup: shown after "Create lobby" is clicked, before the code exists. -->
+  <div class="card" id="setup-panel" style="display:none;">
+    <label class="field-label">Mode</label>
+    <div class="mode-options" id="mode-options">
+      <label class="mode-option"><input type="radio" name="mode" value="classic" checked><span>Classic <em>(all animals)</em></span></label>
+      <label class="mode-option"><input type="radio" name="mode" value="mammals"><span>Mammals only</span></label>
+      <label class="mode-option"><input type="radio" name="mode" value="birds"><span>Birds only</span></label>
+      <label class="mode-option"><input type="radio" name="mode" value="ocean"><span>Ocean animals only</span></label>
+      <label class="mode-option"><input type="radio" name="mode" value="dinosaurs"><span>Dinosaurs only</span></label>
+      <label class="mode-option"><input type="radio" name="mode" value="letters"><span>Letter-locked <em>(rotates every 20s)</em></span></label>
+    </div>
+
+    <label class="field-label" style="margin-top:20px;">Clock length</label>
+    <div class="clock-options" id="clock-options">
+      <label class="clock-option"><input type="radio" name="clock" value="60"><span>60s</span></label>
+      <label class="clock-option"><input type="radio" name="clock" value="90"><span>90s</span></label>
+      <label class="clock-option"><input type="radio" name="clock" value="120" checked><span>120s</span></label>
+      <label class="clock-option"><input type="radio" name="clock" value="180"><span>180s</span></label>
+    </div>
+
+    <div class="error-msg" id="setup-error"></div>
+    <button class="btn btn-primary" id="setup-confirm-btn" style="margin-top:16px;">Create lobby &amp; get code</button>
+    <button class="btn btn-secondary" id="setup-back-btn" style="margin-top:10px;">Back</button>
   </div>
 
   <div class="card">
@@ -35,6 +60,7 @@
   </div>
 
   <p class="hint" id="dict-count" style="margin-top:22px;"></p>
+  <p class="hint" style="margin-top:6px;"><a href="admin.html">Admin sign-in</a></p>
 </div>
 
 <script src="js/firebase-config.js"></script>

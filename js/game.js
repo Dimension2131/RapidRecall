@@ -1,15 +1,42 @@
-// Gameplay: waiting room -> live duel -> result screen.
-// Timer model: each player has {baseTime, baseTimestamp}. Effective remaining
-// time = baseTime - (now - baseTimestamp)/1000. Every guess resets the anchor
-// (new baseTime, baseTimestamp = now), which naturally folds "ticking down in
-// real time" and "+2 / -5 adjustments" into one formula with no extra fields.
+// Gameplay: waiting room -> live duel -> result screen -> optional rematch.
+//
+// SCORING MODEL: running out of time locks a player out of guessing but does
+// NOT end the match by itself. The match ends once BOTH players are "done"
+// (out of time, or one forfeits by disconnecting). Whoever named more
+// animals wins; equal counts is a draw.
+//
+// TIMER MODEL: each player has {baseTime, baseTimestamp}. Effective time =
+// baseTime - (now - baseTimestamp)/1000. Every guess resets the anchor.
+//
+// STREAK MODEL: consecutive correct guesses within STREAK_WINDOW_S build a
+// streak that raises the bonus per correct guess (capped). A wrong guess
+// resets the streak; a duplicate or mode-mismatched guess leaves it alone.
+//
+// MODES: classic (any real animal), a category mode (mammals/birds/ocean/
+// dinosaurs, checked against js/categories.js), or "letters" (must start
+// with whichever letter is currently active -- rotates every 20s, computed
+// deterministically from the match's startedAt so every client agrees
+// without needing to sync the rotation through the database).
+//
+// REMATCH / SERIES: after a match ends, both players vote. Once both vote
+// yes, a fresh round starts in the same lobby with the same settings, and a
+// running win/draw tally (the "series") persists across rounds. A player
+// declining ends the series.
+//
+// ADMIN: see admin.html / README for the (client-side-only) admin gate that
+// lets a signed-in admin spectate any lobby and overturn a log entry or
+// hand back time.
 
-const TOTAL_TIME = 120;
 const CORRECT_BONUS = 2;
 const WRONG_PENALTY = 5;
-const CIRC = 2 * Math.PI * 34; // 213.6..., matches the SVG r=34 dials
+const STREAK_WINDOW_S = 8;
+const STREAK_BONUS_CAP = 5;
+const HARD_CAP_SECONDS = 900;
+const CIRC = 2 * Math.PI * 34;
+const DEFAULT_CLOCK = 120;
 
 function fb() { return window.__fb; }
+function isAdmin() { return localStorage.getItem('aw_is_admin') === '1'; }
 
 const params = new URLSearchParams(window.location.search);
 const CODE = (params.get('code') || '').replace(/\D/g, '').slice(0, 6);
@@ -17,6 +44,7 @@ const CODE = (params.get('code') || '').replace(/\D/g, '').slice(0, 6);
 const els = {
   codeEyebrow: document.getElementById('code-eyebrow'),
   mastheadTitle: document.getElementById('masthead-title'),
+  modeBadge: document.getElementById('mode-badge'),
   joinPanel: document.getElementById('join-panel'),
   joinUsername: document.getElementById('join-username'),
   joinPanelError: document.getElementById('join-panel-error'),
@@ -26,28 +54,39 @@ const els = {
   copyCodeBtn: document.getElementById('copy-code-btn'),
   copyLinkBtn: document.getElementById('copy-link-btn'),
   gamePanel: document.getElementById('game-panel'),
+  letterBanner: document.getElementById('letter-banner'),
+  letterCurrent: document.getElementById('letter-current'),
+  letterCountdown: document.getElementById('letter-countdown'),
   guessForm: document.getElementById('guess-form'),
   guessInput: document.getElementById('guess-input'),
   guessSubmit: document.getElementById('guess-submit'),
+  spectateNote: document.getElementById('spectate-note'),
   feedback: document.getElementById('feedback'),
   logList: document.getElementById('log-list'),
   logCount: document.getElementById('log-count'),
   resultOverlay: document.getElementById('result-overlay'),
   resultTitle: document.getElementById('result-title'),
+  resultSub: document.getElementById('result-sub'),
   resultNameP1: document.getElementById('result-name-p1'),
   resultNameP2: document.getElementById('result-name-p2'),
   resultScoreP1: document.getElementById('result-score-p1'),
   resultScoreP2: document.getElementById('result-score-p2'),
-  rematchBtn: document.getElementById('rematch-btn'),
+  seriesRow: document.getElementById('series-row'),
+  rematchRowPlayer: document.getElementById('rematch-row-player'),
+  rematchYesBtn: document.getElementById('rematch-yes-btn'),
+  rematchNoBtn: document.getElementById('rematch-no-btn'),
+  rematchStatus: document.getElementById('rematch-status'),
+  rematchRowSpectator: document.getElementById('rematch-row-spectator'),
 };
 
-let mySlot = null;       // 'p1' | 'p2'
+let mySlot = null;       // 'p1' | 'p2' | 'spectator' | 'admin'
 let myClientId = null;
 let lobbyRef = null;
-let latestLobby = null;  // last snapshot from onValue
+let latestLobby = null;
 let tickHandle = null;
-let myTimeoutReported = false;
+let myDoneReported = false;
 let disconnectTimer = null;
+let resultShownForFinishedAt = null; // avoid re-showing overlay repeatedly on every snapshot
 
 els.codeEyebrow.textContent = CODE ? `#${CODE}` : '';
 
@@ -62,15 +101,17 @@ if (!CODE || CODE.length !== 6) {
 }
 
 window.addEventListener('fb-ready', init, { once: true });
-// In case firebase-init.js already fired before we attached the listener
-// (module scripts execute in document order, so normally this won't race,
-// but this is a harmless safety net).
 if (window.__fb) init();
 
 async function init() {
   const { db, ref } = fb();
   lobbyRef = ref(db, 'lobbies/' + CODE);
   myClientId = getClientId();
+
+  if (isAdmin()) {
+    finalizeSlot('admin');
+    return;
+  }
 
   const saved = JSON.parse(localStorage.getItem('aw_last_lobby') || 'null');
   if (saved && saved.code === CODE && (saved.slot === 'p1' || saved.slot === 'p2')) {
@@ -79,11 +120,44 @@ async function init() {
     return;
   }
 
-  // Not recognized locally (e.g. opened a shared link directly) -> ask for a name and join.
-  els.joinPanel.style.display = 'block';
-  els.joinUsername.value = getSavedUsername();
-  els.joinPanelBtn.addEventListener('click', attemptDirectJoin);
-  els.joinUsername.addEventListener('keydown', (e) => { if (e.key === 'Enter') attemptDirectJoin(); });
+  await resolveAndJoin();
+}
+
+async function resolveAndJoin() {
+  const { get } = fb();
+  let snap;
+  try {
+    snap = await get(lobbyRef);
+  } catch (err) {
+    console.error(err);
+    els.mastheadTitle.textContent = 'Could not load lobby';
+    return;
+  }
+  if (!snap.exists()) {
+    els.mastheadTitle.textContent = 'Lobby not found';
+    const p = document.createElement('p');
+    p.className = 'hint';
+    p.innerHTML = 'No lobby with that code exists (it may have expired). <a href="index.html">Return home</a>.';
+    document.querySelector('.masthead').appendChild(p);
+    return;
+  }
+  const lobby = snap.val();
+  if (lobby.players?.p1?.clientId === myClientId) { finalizeSlot('p1'); return; }
+  if (lobby.players?.p2?.clientId === myClientId) { finalizeSlot('p2'); return; }
+
+  if (lobby.players?.p2) {
+    finalizeSlot('spectator');
+    return;
+  }
+
+  const name = getSavedUsername();
+  if (name) {
+    await claimPlayerSlot(name, 'p2');
+  } else {
+    els.joinPanel.style.display = 'block';
+    els.joinPanelBtn.addEventListener('click', attemptDirectJoin);
+    els.joinUsername.addEventListener('keydown', (e) => { if (e.key === 'Enter') attemptDirectJoin(); });
+  }
 }
 
 async function attemptDirectJoin() {
@@ -92,42 +166,22 @@ async function attemptDirectJoin() {
   saveUsername(name);
   els.joinPanelBtn.disabled = true;
   els.joinPanelBtn.textContent = 'Joining…';
+  await claimPlayerSlot(name, 'p2');
+}
+
+async function claimPlayerSlot(name, slot) {
   try {
-    const { get, runTransaction, ref, db } = fb();
-    const snap = await get(lobbyRef);
-    if (!snap.exists()) {
-      els.joinPanelError.textContent = 'No lobby found with that code.';
-      els.joinPanelBtn.disabled = false;
-      els.joinPanelBtn.textContent = 'Join this lobby';
+    const { ref, db, runTransaction } = fb();
+    const slotRef = ref(db, `lobbies/${CODE}/players/${slot}`);
+    const result = await runTransaction(slotRef, (current) => {
+      if (current) return;
+      return { name, clientId: myClientId, connected: true, correct: 0, wrong: 0, streak: 0 };
+    });
+    if (!result.committed) {
+      finalizeSlot('spectator');
       return;
     }
-    const lobby = snap.val();
-    if (lobby.players?.p1?.clientId === myClientId) {
-      mySlot = 'p1';
-    } else if (lobby.players?.p2?.clientId === myClientId) {
-      mySlot = 'p2';
-    } else if (lobby.players?.p1 && lobby.players?.p2) {
-      els.joinPanelError.textContent = 'That lobby already has two players.';
-      els.joinPanelBtn.disabled = false;
-      els.joinPanelBtn.textContent = 'Join this lobby';
-      return;
-    } else {
-      const p2Ref = ref(db, `lobbies/${CODE}/players/p2`);
-      const result = await runTransaction(p2Ref, (current) => {
-        if (current) return;
-        return { name, clientId: myClientId, connected: true, correct: 0, wrong: 0 };
-      });
-      if (!result.committed) {
-        els.joinPanelError.textContent = 'That lobby already has two players.';
-        els.joinPanelBtn.disabled = false;
-        els.joinPanelBtn.textContent = 'Join this lobby';
-        return;
-      }
-      mySlot = 'p2';
-    }
-    localStorage.setItem('aw_last_lobby', JSON.stringify({ code: CODE, slot: mySlot }));
-    els.joinPanel.style.display = 'none';
-    attachLobbyListener();
+    finalizeSlot(slot);
   } catch (err) {
     console.error(err);
     els.joinPanelError.textContent = 'Something went wrong joining. Please try again.';
@@ -136,13 +190,29 @@ async function attemptDirectJoin() {
   }
 }
 
+function finalizeSlot(slot) {
+  mySlot = slot;
+  if (slot === 'p1' || slot === 'p2') {
+    localStorage.setItem('aw_last_lobby', JSON.stringify({ code: CODE, slot }));
+  }
+  els.joinPanel.style.display = 'none';
+  attachLobbyListener();
+}
+
 function attachLobbyListener() {
   const { onValue, onDisconnect, ref, set } = fb();
 
-  // Mark myself present, and tidy up if this tab closes.
-  const connFlagRef = ref(fb().db, `lobbies/${CODE}/players/${mySlot}/connected`);
-  set(connFlagRef, true).catch(() => {});
-  onDisconnect(connFlagRef).set(false);
+  if (mySlot === 'p1' || mySlot === 'p2') {
+    const connFlagRef = ref(fb().db, `lobbies/${CODE}/players/${mySlot}/connected`);
+    set(connFlagRef, true).catch(() => {});
+    onDisconnect(connFlagRef).set(false);
+  } else {
+    const specRef = ref(fb().db, `lobbies/${CODE}/spectators/${myClientId}`);
+    set(specRef, mySlot === 'admin' ? 'admin' : true).catch(() => {});
+    onDisconnect(specRef).remove();
+  }
+
+  document.body.classList.toggle('is-admin', mySlot === 'admin');
 
   onValue(lobbyRef, (snap) => {
     if (!snap.exists()) {
@@ -153,10 +223,8 @@ function attachLobbyListener() {
     latestLobby = lobby;
     render(lobby);
     maybeStartGame(lobby);
-    watchOpponentDisconnect(lobby);
-    if (lobby.status === 'finished') {
-      showResult(lobby);
-    }
+    if (mySlot === 'p1' || mySlot === 'p2') watchOpponentDisconnect(lobby);
+    if (lobby.status === 'finished') showResult(lobby);
   });
 
   els.copyCodeBtn.addEventListener('click', () => {
@@ -171,12 +239,17 @@ function attachLobbyListener() {
   });
 
   els.guessForm.addEventListener('submit', onSubmitGuess);
-  els.rematchBtn.addEventListener('click', () => { window.location.href = 'index.html'; });
+  els.rematchYesBtn.addEventListener('click', () => castRematchVote(true));
+  els.rematchNoBtn.addEventListener('click', () => castRematchVote(false));
+  els.rematchRowSpectator.addEventListener('click', () => { window.location.href = 'index.html'; });
 
   if (!tickHandle) tickHandle = setInterval(tick, 100);
 }
 
-// Whoever notices both players present flips status waiting -> active exactly once.
+function clockSecondsFor(lobby) {
+  return lobby?.settings?.clockSeconds || DEFAULT_CLOCK;
+}
+
 async function maybeStartGame(lobby) {
   if (lobby.status !== 'waiting') return;
   if (!lobby.players?.p1 || !lobby.players?.p2) return;
@@ -185,16 +258,16 @@ async function maybeStartGame(lobby) {
     if (!cur || cur.status !== 'waiting') return cur;
     if (!cur.players?.p1 || !cur.players?.p2) return cur;
     const now = Date.now();
+    const clock = clockSecondsFor(cur);
     cur.status = 'active';
     cur.startedAt = now;
-    cur.players.p1.baseTime = TOTAL_TIME;
-    cur.players.p1.baseTimestamp = now;
-    cur.players.p1.correct = cur.players.p1.correct || 0;
-    cur.players.p1.wrong = cur.players.p1.wrong || 0;
-    cur.players.p2.baseTime = TOTAL_TIME;
-    cur.players.p2.baseTimestamp = now;
-    cur.players.p2.correct = cur.players.p2.correct || 0;
-    cur.players.p2.wrong = cur.players.p2.wrong || 0;
+    for (const slot of ['p1', 'p2']) {
+      cur.players[slot].baseTime = clock;
+      cur.players[slot].baseTimestamp = now;
+      cur.players[slot].correct = cur.players[slot].correct || 0;
+      cur.players[slot].wrong = cur.players[slot].wrong || 0;
+      cur.players[slot].streak = 0;
+    }
     return cur;
   });
 }
@@ -204,56 +277,109 @@ function watchOpponentDisconnect(lobby) {
   const oppSlot = mySlot === 'p1' ? 'p2' : 'p1';
   const opp = lobby.players?.[oppSlot];
   if (opp && opp.connected === false && !disconnectTimer) {
-    disconnectTimer = setTimeout(() => {
-      reportTimeout(oppSlot);
-    }, 5000);
+    disconnectTimer = setTimeout(() => { reportForfeit(oppSlot); }, 5000);
   } else if (opp && opp.connected !== false && disconnectTimer) {
     clearTimeout(disconnectTimer);
     disconnectTimer = null;
   }
 }
 
-function effectiveTime(player) {
-  if (!player || player.baseTime == null || player.baseTimestamp == null) return TOTAL_TIME;
+function effectiveTime(player, clockSeconds) {
+  if (!player || player.baseTime == null || player.baseTimestamp == null) return clockSeconds || DEFAULT_CLOCK;
   const elapsed = (Date.now() - player.baseTimestamp) / 1000;
   return player.baseTime - elapsed;
+}
+
+function computeWinner(cur) {
+  const c1 = cur.players?.p1?.correct || 0;
+  const c2 = cur.players?.p2?.correct || 0;
+  if (c1 > c2) return 'p1';
+  if (c2 > c1) return 'p2';
+  return 'draw';
+}
+
+function bumpSeries(cur, winner) {
+  cur.series = cur.series || { wins: { p1: 0, p2: 0 }, draws: 0, round: 1 };
+  if (winner === 'draw') cur.series.draws = (cur.series.draws || 0) + 1;
+  else if (winner === 'p1' || winner === 'p2') cur.series.wins[winner] = (cur.series.wins[winner] || 0) + 1;
+}
+function unbumpSeries(cur, winner) {
+  if (!cur.series) return;
+  if (winner === 'draw') cur.series.draws = Math.max(0, (cur.series.draws || 0) - 1);
+  else if (winner === 'p1' || winner === 'p2') cur.series.wins[winner] = Math.max(0, (cur.series.wins[winner] || 0) - 1);
 }
 
 function tick() {
   if (!latestLobby) return;
   render(latestLobby);
-  if (latestLobby.status === 'active') {
+  if (latestLobby.status !== 'active') return;
+
+  if (mySlot === 'p1' || mySlot === 'p2') {
+    const clock = clockSecondsFor(latestLobby);
     const mine = latestLobby.players?.[mySlot];
-    const t = effectiveTime(mine);
-    if (t <= 0 && !myTimeoutReported) {
-      myTimeoutReported = true;
-      reportTimeout(mySlot);
+    const t = effectiveTime(mine, clock);
+    const alreadyDone = latestLobby.doneFlags && latestLobby.doneFlags[mySlot];
+    if (t <= 0 && !alreadyDone && !myDoneReported) {
+      myDoneReported = true;
+      reportDone(mySlot);
     }
+  }
+
+  if (latestLobby.startedAt && (Date.now() - latestLobby.startedAt) / 1000 > HARD_CAP_SECONDS) {
+    forceEndByCap();
   }
 }
 
-async function reportTimeout(slotThatRanOut) {
+async function reportDone(slot) {
   const { runTransaction } = fb();
   await runTransaction(lobbyRef, (cur) => {
     if (!cur || cur.status !== 'active') return cur;
-    cur.timeoutReported = cur.timeoutReported || {};
-    cur.timeoutReported[slotThatRanOut] = true;
-    const p1out = !!cur.timeoutReported.p1;
-    const p2out = !!cur.timeoutReported.p2;
-    if (p1out || p2out) {
+    cur.doneFlags = cur.doneFlags || {};
+    if (cur.doneFlags[slot]) return cur;
+    cur.doneFlags[slot] = true;
+    if (cur.doneFlags.p1 && cur.doneFlags.p2) {
       cur.status = 'finished';
-      cur.winner = (p1out && p2out) ? 'draw' : (p1out ? 'p2' : 'p1');
+      cur.winner = computeWinner(cur);
       cur.finishedAt = Date.now();
+      cur.endReason = 'time';
+      bumpSeries(cur, cur.winner);
     }
     return cur;
   });
 }
 
-function setDial(slot, seconds) {
-  const frac = Math.max(0, Math.min(1, seconds / TOTAL_TIME));
+async function reportForfeit(disconnectedSlot) {
+  const { runTransaction } = fb();
+  const winnerSlot = disconnectedSlot === 'p1' ? 'p2' : 'p1';
+  await runTransaction(lobbyRef, (cur) => {
+    if (!cur || cur.status !== 'active') return cur;
+    cur.status = 'finished';
+    cur.winner = winnerSlot;
+    cur.finishedAt = Date.now();
+    cur.endReason = 'forfeit';
+    bumpSeries(cur, cur.winner);
+    return cur;
+  });
+}
+
+async function forceEndByCap() {
+  const { runTransaction } = fb();
+  await runTransaction(lobbyRef, (cur) => {
+    if (!cur || cur.status !== 'active') return cur;
+    cur.status = 'finished';
+    cur.winner = computeWinner(cur);
+    cur.finishedAt = Date.now();
+    cur.endReason = 'cap';
+    bumpSeries(cur, cur.winner);
+    return cur;
+  });
+}
+
+function setDial(slot, seconds, clockSeconds) {
+  const frac = Math.max(0, Math.min(1, seconds / clockSeconds));
   const offset = (1 - frac) * CIRC;
   const dial = document.getElementById('dial-' + slot);
-  const low = seconds <= 15;
+  const low = seconds <= Math.min(15, clockSeconds * 0.15);
   dial.style.strokeDashoffset = offset.toFixed(2);
   dial.classList.toggle('low', low);
   document.getElementById('dial-num-' + slot).textContent = formatTime(seconds);
@@ -265,6 +391,20 @@ function setDial(slot, seconds) {
 function render(lobby) {
   const waiting = lobby.status === 'waiting';
   const active = lobby.status === 'active' || lobby.status === 'finished';
+  const clock = clockSecondsFor(lobby);
+
+  if (lobby.status === 'active') {
+    // Covers the "a new round just started via rematch" case -- the overlay
+    // from the previous round's result needs to close back out.
+    if (els.resultOverlay.style.display !== 'none') els.resultOverlay.style.display = 'none';
+    resultShownForFinishedAt = null;
+  }
+
+  if (lobby.settings) {
+    const label = MODE_LABELS[lobby.settings.mode] || 'Classic';
+    els.modeBadge.textContent = `${label} · ${clock}s clock`;
+    els.modeBadge.style.display = 'inline-block';
+  }
 
   els.waitingPanel.style.display = waiting ? 'block' : 'none';
   els.gamePanel.style.display = active ? 'block' : 'none';
@@ -275,7 +415,28 @@ function render(lobby) {
     return;
   }
 
-  els.mastheadTitle.textContent = lobby.status === 'finished' ? 'Duel finished' : 'Duel in progress';
+  const amPlayer = mySlot === 'p1' || mySlot === 'p2';
+  const amSpectating = mySlot === 'spectator' || mySlot === 'admin';
+
+  if (lobby.status === 'finished') {
+    els.mastheadTitle.textContent = 'Duel finished';
+  } else if (mySlot === 'admin') {
+    els.mastheadTitle.textContent = 'Admin view';
+  } else if (amSpectating) {
+    els.mastheadTitle.textContent = 'Spectating';
+  } else {
+    els.mastheadTitle.textContent = 'Duel in progress';
+  }
+
+  // Letter-round banner
+  if (lobby.settings?.mode === 'letters' && lobby.startedAt) {
+    const { letter, secondsLeft } = currentLetterRound(lobby.startedAt);
+    els.letterBanner.style.display = 'flex';
+    els.letterCurrent.textContent = letter;
+    els.letterCountdown.textContent = lobby.status === 'finished' ? '' : `(next in ${secondsLeft}s)`;
+  } else {
+    els.letterBanner.style.display = 'none';
+  }
 
   for (const slot of ['p1', 'p2']) {
     const p = lobby.players?.[slot];
@@ -284,44 +445,90 @@ function render(lobby) {
     document.getElementById('you-tag-' + slot).style.display = slot === mySlot ? 'inline-block' : 'none';
     document.getElementById('panel-' + slot).classList.toggle('is-you', slot === mySlot);
     document.getElementById('panel-' + slot).classList.toggle('disconnected', p.connected === false);
-    document.getElementById('counts-' + slot).textContent = `${p.correct || 0} correct · ${p.wrong || 0} wrong`;
-    setDial(slot, Math.max(0, effectiveTime(p)));
+    const done = lobby.doneFlags && lobby.doneFlags[slot];
+    const streak = p.streak || 0;
+    const streakTxt = streak >= 2 ? ` · 🔥streak ${streak}` : '';
+    document.getElementById('counts-' + slot).textContent =
+      `${p.correct || 0} correct · ${p.wrong || 0} wrong${streakTxt}${done ? ' · done' : ''}`;
+    setDial(slot, Math.max(0, effectiveTime(p, clock)), clock);
+    renderAdminTimeControls(slot);
   }
 
-  const iAmOut = myTimeoutReported || (lobby.timeoutReported && lobby.timeoutReported[mySlot]);
+  const iAmDone = amPlayer && (myDoneReported || (lobby.doneFlags && lobby.doneFlags[mySlot]));
   const gameOver = lobby.status === 'finished';
-  const canGuess = lobby.status === 'active' && !iAmOut;
+  const canGuess = amPlayer && lobby.status === 'active' && !iAmDone;
+
+  els.guessForm.style.display = amPlayer ? 'flex' : 'none';
+  if (els.spectateNote) {
+    els.spectateNote.style.display = amPlayer ? 'none' : 'block';
+    if (!amPlayer) {
+      els.spectateNote.textContent = mySlot === 'admin'
+        ? 'Admin view — you can overturn log entries and adjust time below.'
+        : "You're spectating this duel.";
+    }
+  }
   els.guessInput.disabled = !canGuess;
   els.guessSubmit.disabled = !canGuess;
-  if (gameOver) {
-    els.guessInput.placeholder = 'Expedition complete';
-  } else if (iAmOut) {
-    els.guessInput.placeholder = "You're out of time";
-  } else {
-    els.guessInput.placeholder = 'Name an animal…';
+  if (amPlayer) {
+    if (gameOver) {
+      els.guessInput.placeholder = 'Expedition complete';
+    } else if (iAmDone) {
+      els.guessInput.placeholder = "You're out of time — waiting on your opponent…";
+    } else {
+      els.guessInput.placeholder = 'Name an animal…';
+    }
   }
 
   renderLog(lobby);
+  if (lobby.status === 'finished') renderRematchState(lobby);
+}
+
+function renderAdminTimeControls(slot) {
+  if (mySlot !== 'admin') return;
+  const row = document.getElementById('admin-time-' + slot);
+  if (!row || row.dataset.bound) return;
+  row.dataset.bound = '1';
+  row.querySelector('.admin-plus').addEventListener('click', () => adminAdjustTime(slot, 5));
+  row.querySelector('.admin-minus').addEventListener('click', () => adminAdjustTime(slot, -5));
+}
+
+function resultLabel(result, word) {
+  if (result === 'dup') return `${word} (already used)`;
+  if (result === 'mode-mismatch') return `${word} (doesn't fit this round)`;
+  return word;
 }
 
 function renderLog(lobby) {
-  const entries = Object.values(lobby.log || {}).sort((a, b) => a.ts - b.ts);
-  els.logCount.textContent = `${entries.filter(e => e.result === 'correct').length} specimens`;
+  const entries = Object.entries(lobby.log || {}).sort((a, b) => a[1].ts - b[1].ts);
+  els.logCount.textContent = `${entries.filter(([, e]) => e.result === 'correct').length} specimens`;
   if (entries.length === 0) {
     els.logList.innerHTML = '<li class="empty-log">No guesses yet — first correct animal starts the log.</li>';
     return;
   }
-  els.logList.innerHTML = entries.map((e) => {
+  els.logList.innerHTML = entries.map(([key, e]) => {
     const wrongCls = e.result === 'wrong' ? ' wrongword' : '';
     const deltaCls = e.delta > 0 ? 'pos' : (e.delta < 0 ? 'neg' : '');
     const deltaText = e.delta > 0 ? `+${e.delta}s` : (e.delta < 0 ? `${e.delta}s` : '±0s');
-    const label = e.result === 'dup' ? `${e.word} (already used)` : e.word;
+    const label = resultLabel(e.result, e.word);
+    const overturned = e.overturned ? ' <span class="log-overturned">(overturned)</span>' : '';
+    let adminBtns = '';
+    if (mySlot === 'admin' && e.result !== 'dup') {
+      if (e.result !== 'correct') adminBtns += `<button type="button" class="admin-mini-btn" data-logkey="${key}" data-target="correct">Mark correct</button>`;
+      if (e.result !== 'wrong') adminBtns += `<button type="button" class="admin-mini-btn" data-logkey="${key}" data-target="wrong">Mark wrong</button>`;
+    }
     return `<li>
       <span class="log-tag ${e.slot}">${e.slot === 'p1' ? (lobby.players?.p1?.name || 'P1') : (lobby.players?.p2?.name || 'P2')}</span>
-      <span class="log-word${wrongCls}">${escapeHtml(label)}</span>
+      <span class="log-word${wrongCls}">${escapeHtml(label)}${overturned}</span>
       <span class="log-delta ${deltaCls}">${deltaText}</span>
+      ${adminBtns}
     </li>`;
   }).join('');
+
+  if (mySlot === 'admin') {
+    els.logList.querySelectorAll('.admin-mini-btn').forEach((btn) => {
+      btn.addEventListener('click', () => adminOverturn(btn.dataset.logkey, btn.dataset.target));
+    });
+  }
 }
 
 function escapeHtml(s) {
@@ -330,6 +537,7 @@ function escapeHtml(s) {
 
 async function onSubmitGuess(e) {
   e.preventDefault();
+  if (mySlot !== 'p1' && mySlot !== 'p2') return;
   const raw = els.guessInput.value;
   if (!raw.trim()) return;
   els.guessInput.value = '';
@@ -342,34 +550,45 @@ async function onSubmitGuess(e) {
     if (!cur || cur.status !== 'active') return cur;
     const mine = cur.players?.[mySlot];
     if (!mine) return cur;
-    if (effectiveTime(mine) <= 0) return cur; // already out, ignore
+    const clock = clockSecondsFor(cur);
+    if (effectiveTime(mine, clock) <= 0) return cur;
 
     cur.usedAnimals = cur.usedAnimals || {};
     let result, delta;
+    const now = Date.now();
+    const curTime = effectiveTime(mine, clock);
+
     if (!canonical) {
-      result = 'wrong'; delta = -WRONG_PENALTY;
+      result = 'wrong';
+      delta = -WRONG_PENALTY;
+      mine.streak = 0;
+      mine.wrong = (mine.wrong || 0) + 1;
     } else if (cur.usedAnimals[canonical]) {
-      result = 'dup'; delta = 0;
+      result = 'dup';
+      delta = 0;
+    } else if (!matchesMode(canonical, cur.settings?.mode, cur.startedAt)) {
+      result = 'mode-mismatch';
+      delta = 0;
     } else {
-      result = 'correct'; delta = CORRECT_BONUS;
+      result = 'correct';
+      const priorStreak = mine.streak || 0;
+      const gap = mine.lastCorrectAt ? (now - mine.lastCorrectAt) / 1000 : Infinity;
+      const newStreak = (priorStreak > 0 && gap <= STREAK_WINDOW_S) ? priorStreak + 1 : 1;
+      const streakBonus = Math.min(STREAK_BONUS_CAP, newStreak - 1);
+      delta = CORRECT_BONUS + streakBonus;
+      mine.streak = newStreak;
+      mine.lastCorrectAt = now;
+      mine.correct = (mine.correct || 0) + 1;
       cur.usedAnimals[canonical] = mySlot;
     }
 
-    const now = Date.now();
-    const curTime = effectiveTime(mine);
     mine.baseTime = curTime + delta;
     mine.baseTimestamp = now;
-    if (result === 'correct') mine.correct = (mine.correct || 0) + 1;
-    if (result === 'wrong') mine.wrong = (mine.wrong || 0) + 1;
     cur.players[mySlot] = mine;
 
     cur.log = cur.log || {};
     const logKey = 'l' + now + '_' + Math.floor(Math.random() * 100000);
-    cur.log[logKey] = {
-      slot: mySlot,
-      word: canonical || normalizeGuess(raw) || raw.trim(),
-      result, delta, ts: now
-    };
+    cur.log[logKey] = { slot: mySlot, word: canonical || normalizeGuess(raw) || raw.trim(), result, delta, ts: now };
 
     return cur;
   });
@@ -387,13 +606,17 @@ function showFeedback(entry) {
   if (!entry) return;
   els.feedback.classList.remove('correct', 'wrong', 'dup');
   if (entry.result === 'correct') {
-    els.feedback.textContent = `✓ ${capitalize(entry.word)} — +${entry.delta}s`;
+    const streakTxt = entry.delta > CORRECT_BONUS ? ` (streak bonus!)` : '';
+    els.feedback.textContent = `✓ ${capitalize(entry.word)} — +${entry.delta}s${streakTxt}`;
     els.feedback.classList.add('correct');
   } else if (entry.result === 'dup') {
     els.feedback.textContent = `${capitalize(entry.word)} was already guessed.`;
     els.feedback.classList.add('dup');
+  } else if (entry.result === 'mode-mismatch') {
+    els.feedback.textContent = `${capitalize(entry.word)} is real, but doesn't fit this round.`;
+    els.feedback.classList.add('dup');
   } else {
-    els.feedback.textContent = `Not a recognized animal — ${WRONG_PENALTY}s.`;
+    els.feedback.textContent = `Not a recognized animal — ${WRONG_PENALTY}s, streak reset.`;
     els.feedback.classList.add('wrong');
   }
 }
@@ -401,7 +624,13 @@ function showFeedback(entry) {
 function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
 function showResult(lobby) {
-  if (els.resultOverlay.style.display === 'flex') return;
+  if (resultShownForFinishedAt === lobby.finishedAt) {
+    // Already displayed for this finish event; render() still keeps names/scores fresh.
+    els.resultOverlay.style.display = 'flex';
+    renderRematchState(lobby);
+    return;
+  }
+  resultShownForFinishedAt = lobby.finishedAt;
   els.resultOverlay.style.display = 'flex';
   const p1 = lobby.players?.p1 || {};
   const p2 = lobby.players?.p2 || {};
@@ -421,4 +650,171 @@ function showResult(lobby) {
     title = 'Expedition complete';
   }
   els.resultTitle.textContent = title;
+  if (els.resultSub) {
+    els.resultSub.textContent = lobby.endReason === 'forfeit'
+      ? 'Decided by forfeit — opponent disconnected.'
+      : 'Decided by total animals named.';
+  }
+
+  const amPlayer = mySlot === 'p1' || mySlot === 'p2';
+  els.rematchRowPlayer.style.display = amPlayer ? 'flex' : 'none';
+  els.rematchRowSpectator.style.display = amPlayer ? 'none' : 'block';
+
+  renderRematchState(lobby);
+}
+
+function renderRematchState(lobby) {
+  const s = lobby.series || { wins: { p1: 0, p2: 0 }, draws: 0, round: 1 };
+  const p1 = lobby.players?.p1 || {};
+  const p2 = lobby.players?.p2 || {};
+  els.seriesRow.innerHTML =
+    `<span>Round ${s.round || 1}</span>` +
+    `<span><strong>${p1.name || 'P1'}</strong> ${s.wins?.p1 || 0}</span>` +
+    `<span>Draws ${s.draws || 0}</span>` +
+    `<span><strong>${p2.name || 'P2'}</strong> ${s.wins?.p2 || 0}</span>`;
+
+  const amPlayer = mySlot === 'p1' || mySlot === 'p2';
+  if (!amPlayer) return;
+
+  const votes = lobby.rematchVotes || {};
+  const oppSlot = mySlot === 'p1' ? 'p2' : 'p1';
+  const oppName = (lobby.players?.[oppSlot]?.name) || 'Opponent';
+
+  if (votes[oppSlot] === false) {
+    els.rematchStatus.textContent = `${oppName} chose not to rematch.`;
+    els.rematchYesBtn.disabled = true;
+  } else if (votes[mySlot] === true) {
+    els.rematchStatus.textContent = `Waiting for ${oppName} to respond…`;
+    els.rematchYesBtn.disabled = true;
+  } else {
+    els.rematchStatus.textContent = '';
+    els.rematchYesBtn.disabled = false;
+  }
+}
+
+async function castRematchVote(vote) {
+  if (mySlot !== 'p1' && mySlot !== 'p2') return;
+  const { runTransaction } = fb();
+  await runTransaction(lobbyRef, (cur) => {
+    if (!cur || cur.status !== 'finished') return cur;
+    cur.rematchVotes = cur.rematchVotes || {};
+    cur.rematchVotes[mySlot] = vote;
+    if (vote === true && cur.rematchVotes.p1 === true && cur.rematchVotes.p2 === true) {
+      startNewRound(cur);
+    }
+    return cur;
+  });
+  if (vote === false) {
+    window.location.href = 'index.html';
+  }
+}
+
+function startNewRound(cur) {
+  const now = Date.now();
+  const clock = clockSecondsFor(cur);
+  cur.status = 'active';
+  cur.startedAt = now;
+  cur.winner = null;
+  cur.endReason = null;
+  cur.finishedAt = null;
+  cur.usedAnimals = {};
+  cur.log = {};
+  cur.doneFlags = {};
+  cur.rematchVotes = {};
+  cur.series = cur.series || { wins: { p1: 0, p2: 0 }, draws: 0, round: 1 };
+  cur.series.round = (cur.series.round || 1) + 1;
+  for (const slot of ['p1', 'p2']) {
+    if (!cur.players[slot]) continue;
+    cur.players[slot].baseTime = clock;
+    cur.players[slot].baseTimestamp = now;
+    cur.players[slot].correct = 0;
+    cur.players[slot].wrong = 0;
+    cur.players[slot].streak = 0;
+    delete cur.players[slot].lastCorrectAt;
+  }
+}
+
+// ---------------- Admin actions ----------------
+
+async function adminOverturn(logKey, newResult) {
+  if (mySlot !== 'admin') return;
+  const { runTransaction } = fb();
+  await runTransaction(lobbyRef, (cur) => {
+    if (!cur || !cur.log || !cur.log[logKey]) return cur;
+    const entry = cur.log[logKey];
+    if (entry.result === newResult || entry.result === 'dup') return cur;
+    const slot = entry.slot;
+    const player = cur.players?.[slot];
+    if (!player) return cur;
+    const clock = clockSecondsFor(cur);
+
+    const oldDelta = entry.delta;
+    const newDelta = newResult === 'correct' ? CORRECT_BONUS : -WRONG_PENALTY;
+    const diff = newDelta - oldDelta;
+
+    const now = Date.now();
+    const curTime = effectiveTime(player, clock);
+    const newTime = curTime + diff;
+    player.baseTime = newTime;
+    player.baseTimestamp = now;
+
+    if (entry.result === 'correct') player.correct = Math.max(0, (player.correct || 0) - 1);
+    if (entry.result === 'wrong') player.wrong = Math.max(0, (player.wrong || 0) - 1);
+    if (newResult === 'correct') player.correct = (player.correct || 0) + 1;
+    if (newResult === 'wrong') player.wrong = (player.wrong || 0) + 1;
+
+    cur.usedAnimals = cur.usedAnimals || {};
+    if (newResult === 'correct') {
+      cur.usedAnimals[entry.word] = slot;
+    } else if (entry.result === 'correct' && cur.usedAnimals[entry.word] === slot) {
+      delete cur.usedAnimals[entry.word];
+    }
+
+    entry.result = newResult;
+    entry.delta = newDelta;
+    entry.overturned = true;
+    cur.players[slot] = player;
+    cur.log[logKey] = entry;
+
+    reopenIfPositive(cur, slot, newTime);
+    if (cur.status === 'finished' && cur.endReason !== 'forfeit') {
+      const newWinner = computeWinner(cur);
+      if (newWinner !== cur.winner) {
+        unbumpSeries(cur, cur.winner);
+        bumpSeries(cur, newWinner);
+        cur.winner = newWinner;
+      }
+    }
+    return cur;
+  });
+}
+
+async function adminAdjustTime(slot, deltaSeconds) {
+  if (mySlot !== 'admin') return;
+  const { runTransaction } = fb();
+  await runTransaction(lobbyRef, (cur) => {
+    if (!cur || !cur.players?.[slot]) return cur;
+    const player = cur.players[slot];
+    const clock = clockSecondsFor(cur);
+    const now = Date.now();
+    const curTime = effectiveTime(player, clock);
+    const newTime = curTime + deltaSeconds;
+    player.baseTime = newTime;
+    player.baseTimestamp = now;
+    cur.players[slot] = player;
+    reopenIfPositive(cur, slot, newTime);
+    return cur;
+  });
+}
+
+function reopenIfPositive(cur, slot, newTime) {
+  if (newTime > 0 && cur.doneFlags && cur.doneFlags[slot]) {
+    cur.doneFlags[slot] = false;
+    if (cur.status === 'finished' && cur.endReason !== 'forfeit') {
+      unbumpSeries(cur, cur.winner);
+      cur.status = 'active';
+      cur.winner = null;
+      cur.finishedAt = null;
+    }
+  }
 }

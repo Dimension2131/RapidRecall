@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fauna Duel — admin</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="page">
+
+  <div class="masthead">
+    <div class="eyebrow">Admin oversight</div>
+    <h1>Admin</h1>
+    <p class="sub">Sign in to spectate any lobby with the power to overturn a call or hand back lost time.</p>
+  </div>
+
+  <div class="card" id="login-card">
+    <label class="field-label" for="admin-user">Username</label>
+    <input type="text" id="admin-user" autocomplete="off">
+    <label class="field-label" for="admin-pass" style="margin-top:14px;">Password</label>
+    <input type="password" id="admin-pass" autocomplete="off">
+    <div class="error-msg" id="login-error"></div>
+    <button class="btn btn-primary" id="login-btn" style="margin-top:12px;">Sign in</button>
+  </div>
+
+  <div class="card" id="enter-card" style="display:none;">
+    <label class="field-label">Signed in as admin</label>
+    <p class="hint" style="margin-top:0;">Enter any lobby code to spectate it with admin controls.</p>
+    <input type="text" id="admin-code" class="mono" maxlength="6" inputmode="numeric" placeholder="000000" autocomplete="off">
+    <div class="error-msg" id="enter-error"></div>
+    <button class="btn btn-primary" id="enter-btn" style="margin-top:12px;">Open lobby</button>
+    <button class="btn btn-secondary" id="logout-btn" style="margin-top:10px;">Sign out</button>
+  </div>
+
+  <p class="hint" style="margin-top:22px; max-width:480px; text-align:center;">
+    client-side gate
+  </p>
+</div>
+
+<script src="js/admin.js"></script>
+</body>
+</html>

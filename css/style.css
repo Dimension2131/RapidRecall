@@ -456,6 +456,129 @@ input[type="text"].mono {
   padding: 6px 0;
 }
 
+/* ---------- admin & spectator ---------- */
+
+.admin-only { display: none; }
+body.is-admin .admin-only { display: flex; }
+
+.admin-time-row {
+  margin-top: 8px;
+  gap: 6px;
+}
+
+.admin-mini-btn {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--brass);
+  background: rgba(185,134,46,0.12);
+  color: #6b4a15;
+  cursor: pointer;
+  margin-left: 8px;
+}
+.admin-mini-btn:hover { background: rgba(185,134,46,0.25); }
+
+.log-overturned {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: var(--brass);
+  text-transform: uppercase;
+}
+
+/* ---------- game setup (mode + clock picker) ---------- */
+
+.mode-options, .clock-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.clock-options { flex-direction: row; flex-wrap: wrap; }
+
+.mode-option, .clock-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--paper);
+  cursor: pointer;
+  font-size: 14px;
+  transition: border-color .12s ease, background .12s ease;
+}
+.clock-option { flex: 1; justify-content: center; min-width: 64px; }
+
+.mode-option:has(input:checked), .clock-option:has(input:checked) {
+  border-color: var(--brass);
+  background: rgba(185,134,46,0.1);
+}
+
+.mode-option input, .clock-option input { accent-color: var(--brass); }
+.mode-option em, .clock-option em { font-style: normal; color: var(--ink-soft); font-size: 12.5px; }
+
+.mode-badge {
+  display: inline-block;
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--forest-dark);
+  background: rgba(47,74,52,0.1);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 4px 10px;
+  margin-top: 6px;
+}
+
+/* ---------- letter-round banner ---------- */
+
+.letter-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 4px 0 18px;
+  padding: 10px 16px;
+  background: var(--paper-card);
+  border: 1px solid var(--brass);
+  border-radius: 4px;
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+}
+.letter-banner .letter-big {
+  font-family: 'Fraunces', serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--brass);
+  line-height: 1;
+}
+
+/* ---------- rematch / series ---------- */
+
+.series-row {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin: 4px 0 20px;
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.series-row strong { color: var(--forest-dark); }
+
+.rematch-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+.rematch-status {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  min-height: 16px;
+}
+
 /* ---------- result overlay ---------- */
 
 .overlay {

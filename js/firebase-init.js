@@ -5,7 +5,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getDatabase, ref, get, set, update, onValue, onDisconnect,
-  runTransaction, serverTimestamp, push, child
+  runTransaction, serverTimestamp, push, child, remove
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const app = initializeApp(window.FIREBASE_CONFIG);
@@ -15,7 +15,7 @@ const db = getDatabase(app);
 // and the other module scripts can all reach the same instance.
 window.__fb = {
   db, ref, get, set, update, onValue, onDisconnect,
-  runTransaction, serverTimestamp, push, child
+  runTransaction, serverTimestamp, push, child, remove
 };
 
 // Signal readiness for scripts that load before this finishes initializing.

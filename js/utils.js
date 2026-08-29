@@ -27,9 +27,12 @@ function generateLobbyCode() {
 
 /** Normalize a raw guess for dictionary + duplicate lookup:
  *  lowercase, trim, collapse internal whitespace, drop a leading article,
- *  strip surrounding punctuation. */
+ *  strip hyphens (so "aye-aye" and "aye aye" match identically — hyphenation
+ *  is inconsistent across sources and shouldn't cause a correct answer to
+ *  be marked wrong), strip surrounding punctuation. */
 function normalizeGuess(raw) {
   let s = (raw || '').toLowerCase().trim();
+  s = s.replace(/-/g, ' ');
   s = s.replace(/\s+/g, ' ');
   s = s.replace(/^(a|an|the)\s+/, '');
   s = s.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, '');
@@ -86,4 +89,60 @@ function formatTime(seconds) {
   const m = Math.floor(s / 60);
   const rem = s % 60;
   return `${m}:${rem.toString().padStart(2, '0')}`;
+}
+
+// ---------------- Game modes ----------------
+
+const MODE_LABELS = {
+  classic: 'Classic (all animals)',
+  mammals: 'Mammals only',
+  birds: 'Birds only',
+  ocean: 'Ocean animals only',
+  dinosaurs: 'Dinosaurs only',
+  letters: 'Letter-locked (rotates every 20s)',
+};
+
+// Deterministic per-round shuffle of A-Z, seeded from the match's start time
+// so every client (both players + any spectators/admin) computes the exact
+// same letter sequence without needing to sync it through the database.
+function seededLetterSequence(seed) {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  let s = seed >>> 0;
+  function rand() {
+    // mulberry32
+    s |= 0; s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  for (let i = letters.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [letters[i], letters[j]] = [letters[j], letters[i]];
+  }
+  return letters;
+}
+
+const LETTER_ROUND_SECONDS = 20;
+
+/** Given a match's startedAt timestamp, returns the currently-active letter
+ *  for the "letters" mode, plus seconds remaining until it rotates. */
+function currentLetterRound(startedAt) {
+  const seq = seededLetterSequence(startedAt || 0);
+  const elapsed = Math.max(0, (Date.now() - (startedAt || Date.now())) / 1000);
+  const idx = Math.floor(elapsed / LETTER_ROUND_SECONDS) % seq.length;
+  const into = elapsed % LETTER_ROUND_SECONDS;
+  return { letter: seq[idx], secondsLeft: Math.ceil(LETTER_ROUND_SECONDS - into) };
+}
+
+/** Whether a canonical (already-matched) animal name is a legal guess under
+ *  the lobby's configured mode. Classic mode always returns true. */
+function matchesMode(canonical, mode, startedAt) {
+  mode = mode || 'classic';
+  if (mode === 'classic') return true;
+  if (mode === 'letters') {
+    const { letter } = currentLetterRound(startedAt);
+    return canonical.charAt(0).toUpperCase() === letter;
+  }
+  const set = window.CATEGORY_SETS && window.CATEGORY_SETS[mode];
+  return set ? set.has(canonical) : true;
 }
