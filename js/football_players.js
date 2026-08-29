@@ -1,4 +1,4 @@
-// All-time soccer/football player names (85515 entries).
+// All-time football player names (85515 entries).
 // Sourced from salimt/football-datasets on GitHub (a Transfermarkt-derived
 // dataset of 92,671 professional players), covering national teams and
 // major leagues worldwide across history. Non-Latin-script native-name
