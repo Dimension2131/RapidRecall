@@ -1,3 +1,35 @@
+// Gameplay: waiting room -> live duel -> result screen -> optional rematch.
+//
+// SCORING MODEL: running out of time locks a player out of guessing but does
+// NOT end the match by itself. The match ends once BOTH players are "done"
+// (out of time, or one forfeits by disconnecting). Whoever named more
+// correct entries wins; equal counts is a draw.
+//
+// TIMER MODEL: each player has {baseTime, baseTimestamp}. Effective time =
+// baseTime - (now - baseTimestamp)/1000. Every guess resets the anchor.
+//
+// STREAK MODEL: consecutive correct guesses within STREAK_WINDOW_S build a
+// streak that raises the bonus per correct guess (capped). A wrong guess
+// resets the streak; a duplicate or mode-mismatched guess leaves it alone.
+//
+// MODES: classic (any real animal), a category mode (mammals/birds/ocean/
+// dinosaurs, checked against js/categories.js), "letters" (must start
+// with whichever letter is currently active -- rotates every 20s, computed
+// deterministically from the match's startedAt so every client agrees
+// without needing to sync the rotation through the database), or a
+// player-name mode (nba/soccer, checked against their own separate
+// dictionaries in js/nba_players.js / js/soccer_players.js -- full name
+// required, no category/letter restriction layered on top).
+//
+// REMATCH / SERIES: after a match ends, both players vote. Once both vote
+// yes, a fresh round starts in the same lobby with the same settings, and a
+// running win/draw tally (the "series") persists across rounds. A player
+// declining ends the series.
+//
+// ADMIN: see admin.html / README for the (client-side-only) admin gate that
+// lets a signed-in admin spectate any lobby and overturn a log entry or
+// hand back time.
+
 const CORRECT_BONUS = 2;
 const WRONG_PENALTY = 5;
 const STREAK_WINDOW_S = 8;
@@ -9,6 +41,12 @@ const SUDDEN_DEATH_SECONDS = 20;
 const MAX_SUDDEN_DEATH_ROUNDS = 3;
 
 function isLive(status) { return status === 'active' || status === 'sudden_death'; }
+
+function modeNoun(mode) {
+  if (mode === 'nba') return 'NBA player';
+  if (mode === 'soccer') return 'soccer player';
+  return 'animal';
+}
 
 function fb() { return window.__fb; }
 function isAdmin() { return localStorage.getItem('aw_is_admin') === '1'; }
@@ -223,10 +261,6 @@ function attachLobbyListener() {
   const preventFocusSteal = (e) => e.preventDefault();
   els.guessSubmit.addEventListener('mousedown', preventFocusSteal);
   els.guessSubmit.addEventListener('touchstart', preventFocusSteal, { passive: false });
-  els.guessSubmit.addEventListener('touchend', (e) => {
-  e.preventDefault();
-  onSubmitGuess(e);
-  });
   els.rematchYesBtn.addEventListener('click', () => castRematchVote(true));
   els.rematchNoBtn.addEventListener('click', () => castRematchVote(false));
   els.rematchRowSpectator.addEventListener('click', () => { window.location.href = 'index.html'; });
@@ -488,11 +522,11 @@ function render(lobby) {
   els.guessSubmit.disabled = !canGuess;
   if (amPlayer) {
     if (gameOver) {
-      els.guessInput.placeholder = 'Expedition complete';
+      els.guessInput.placeholder = 'Duel complete';
     } else if (iAmDone) {
       els.guessInput.placeholder = "You're out of time — waiting on your opponent…";
     } else {
-      els.guessInput.placeholder = 'Name an animal…';
+      els.guessInput.placeholder = `Name a${/^[aeiou]/i.test(modeNoun(lobby.settings?.mode)) ? 'n' : ''} ${modeNoun(lobby.settings?.mode)}…`;
     }
   }
 
@@ -517,9 +551,9 @@ function resultLabel(result, word) {
 
 function renderLog(lobby) {
   const entries = Object.entries(lobby.log || {}).sort((a, b) => a[1].ts - b[1].ts);
-  els.logCount.textContent = `${entries.filter(([, e]) => e.result === 'correct').length} specimens`;
+  els.logCount.textContent = `${entries.filter(([, e]) => e.result === 'correct').length} correct`;
   if (entries.length === 0) {
-    els.logList.innerHTML = '<li class="empty-log">No guesses yet — first correct animal starts the log.</li>';
+    els.logList.innerHTML = '<li class="empty-log">No guesses yet — first correct answer starts the log.</li>';
     return;
   }
   els.logList.innerHTML = entries.map(([key, e]) => {
@@ -564,7 +598,6 @@ async function onSubmitGuess(e) {
   els.guessInput.focus();
 
   const { runTransaction } = fb();
-  const canonical = matchAnimal(raw);
   const submittedAt = Date.now();
 
   const txResult = await runTransaction(lobbyRef, (cur) => {
@@ -574,6 +607,7 @@ async function onSubmitGuess(e) {
     const clock = clockSecondsFor(cur);
     if (effectiveTime(mine, clock) <= 0) return cur;
 
+    const canonical = matchForMode(raw, cur.settings?.mode);
     cur.usedAnimals = cur.usedAnimals || {};
     let result, delta;
     const now = Date.now();
@@ -638,7 +672,8 @@ function showFeedback(entry) {
     els.feedback.textContent = `${capitalize(entry.word)} is real, but doesn't fit this round.`;
     els.feedback.classList.add('dup');
   } else {
-    els.feedback.textContent = `Not a recognized animal — ${WRONG_PENALTY}s, streak reset.`;
+    const noun = modeNoun(latestLobby?.settings?.mode);
+    els.feedback.textContent = `Not a recognized ${noun} — ${WRONG_PENALTY}s, streak reset.`;
     els.feedback.classList.add('wrong');
   }
 }
@@ -669,7 +704,7 @@ function showResult(lobby) {
   } else if (lobby.winner === 'p1' || lobby.winner === 'p2') {
     title = `${lobby.winner === 'p1' ? p1.name : p2.name} wins`;
   } else {
-    title = 'Expedition complete';
+    title = 'Duel complete';
   }
   els.resultTitle.textContent = title;
   if (els.resultSub) {
@@ -677,7 +712,7 @@ function showResult(lobby) {
       ? 'Decided by forfeit — opponent disconnected.'
       : lobby.endReason === 'sudden_death'
         ? 'Tied after time ran out — decided in sudden death (double points, 20s each).'
-        : 'Decided by total animals named.';
+        : 'Decided by total correct guesses.';
   }
 
   const amPlayer = mySlot === 'p1' || mySlot === 'p2';

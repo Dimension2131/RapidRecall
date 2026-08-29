@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fauna Duel — lobby</title>
+<title>Rapid Recall — lobby</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
 
   <div class="masthead">
     <div class="eyebrow">lobby <span id="code-eyebrow" class="mono"></span></div>
-    <h1 id="masthead-title">Fauna Duel</h1>
+    <h1 id="masthead-title">Rapid Recall</h1>
     <div class="mode-badge" id="mode-badge" style="display:none;"></div>
   </div>
 
@@ -107,7 +107,7 @@
     <div class="feedback-line" id="feedback"></div>
 
     <div class="log-card">
-      <div class="log-title"><span>Field log</span><span id="log-count">0 specimens</span></div>
+      <div class="log-title"><span>Guess log</span><span id="log-count">0 correct</span></div>
       <ul class="log-list" id="log-list">
         <li class="empty-log">No guesses yet — first correct animal starts the log.</li>
       </ul>
@@ -119,7 +119,7 @@
 <!-- Result overlay -->
 <div class="overlay" id="result-overlay" style="display:none;">
   <div class="result-card">
-    <div class="eyebrow">expedition complete</div>
+    <div class="eyebrow">duel complete</div>
     <h2 id="result-title">—</h2>
     <p class="hint" id="result-sub" style="margin-top:-6px;"></p>
     <div class="result-tally">
@@ -146,6 +146,8 @@
 <script type="module" src="js/firebase-init.js"></script>
 <script src="js/animals.js"></script>
 <script src="js/categories.js"></script>
+<script src="js/nba_players.js"></script>
+<script src="js/soccer_players.js"></script>
 <script src="js/utils.js"></script>
 <script type="module" src="js/game.js"></script>
 </body>

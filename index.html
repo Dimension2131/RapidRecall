@@ -3,21 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fauna Duel — animal guessing race</title>
+<title>Rapid Recall — category guessing race</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div class="page">
 
   <div class="masthead">
-    <div class="eyebrow">· two player game ·</div>
-    <h1>Fauna Duel</h1>
-    <p class="sub">Name real animals faster than your opponent. Every correct call buys you time — every miss costs you five seconds.</p>
+    <div class="eyebrow">two players · pick a category</div>
+    <h1>Rapid Recall</h1>
+    <p class="sub">Race your opponent to name as many real animals, NBA players, or soccer players as you can. Every correct answer buys you time — every miss costs you five seconds.</p>
   </div>
 
   <div class="card">
     <label class="field-label" for="username">Your name</label>
-    <input type="text" id="username" maxlength="18" placeholder="e.g. User" autocomplete="off">
+    <input type="text" id="username" maxlength="18" placeholder="e.g. Wren" autocomplete="off">
     <div class="error-msg" id="name-error"></div>
   </div>
 
@@ -37,6 +37,8 @@
       <label class="mode-option"><input type="radio" name="mode" value="ocean"><span>Ocean animals only</span></label>
       <label class="mode-option"><input type="radio" name="mode" value="dinosaurs"><span>Dinosaurs only</span></label>
       <label class="mode-option"><input type="radio" name="mode" value="letters"><span>Letter-locked <em>(rotates every 20s)</em></span></label>
+      <label class="mode-option"><input type="radio" name="mode" value="nba"><span>NBA Players <em>(all-time, full name)</em></span></label>
+      <label class="mode-option"><input type="radio" name="mode" value="soccer"><span>Soccer Players <em>(all-time, full name)</em></span></label>
     </div>
 
     <label class="field-label" style="margin-top:20px;">Clock length</label>

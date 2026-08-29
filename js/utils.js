@@ -1,4 +1,7 @@
+// Shared helpers used by both the home screen and the game screen.
 
+/** Generate a short random client id, persisted per-browser so a page refresh
+ *  can reconnect to the same lobby slot instead of registering as a 3rd player. */
 function getClientId() {
   let id = localStorage.getItem('aw_client_id');
   if (!id) {
@@ -23,16 +26,18 @@ function generateLobbyCode() {
 }
 
 /** Normalize a raw guess for dictionary + duplicate lookup:
- *  lowercase, trim, collapse internal whitespace, drop a leading article,
- *  strip hyphens (so "aye-aye" and "aye aye" match identically — hyphenation
- *  is inconsistent across sources and shouldn't cause a correct answer to
- *  be marked wrong), strip surrounding punctuation. */
+ *  lowercase, trim, fold accents (so "Ümit" and "Umit" match identically --
+ *  useful for player names), strip hyphens and periods (so "aye-aye" /
+ *  "aye aye" and "A.J." / "AJ" all match identically), collapse whitespace,
+ *  drop a leading article, strip surrounding punctuation. */
 function normalizeGuess(raw) {
   let s = (raw || '').toLowerCase().trim();
+  s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // fold accents
   s = s.replace(/-/g, ' ');
+  s = s.replace(/\./g, '');
   s = s.replace(/\s+/g, ' ');
   s = s.replace(/^(a|an|the)\s+/, '');
-  s = s.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, '');
+  s = s.replace(/^[^a-z0-9']+|[^a-z0-9']+$/g, '');
   return s;
 }
 
@@ -81,6 +86,27 @@ function matchAnimal(raw) {
   return null;
 }
 
+/** Exact-match lookup for name dictionaries (NBA/soccer players) where,
+ *  unlike animal names, there's no singular/plural to reconcile -- a full
+ *  name either matches an entry or it doesn't. */
+function matchInSet(raw, set) {
+  if (!set) return null;
+  const norm = normalizeGuess(raw);
+  if (!norm) return null;
+  return set.has(norm) ? norm : null;
+}
+
+/** Given a mode key, returns the right verifier function's result for a raw
+ *  guess: the matched canonical form, or null if it's not a real entry in
+ *  that mode's underlying dictionary. Category/letter modes still draw from
+ *  ANIMAL_SET (matchesMode below layers the extra restriction on top);
+ *  'nba' and 'soccer' draw from their own separate name dictionaries. */
+function matchForMode(raw, mode) {
+  if (mode === 'nba') return matchInSet(raw, window.NBA_PLAYERS);
+  if (mode === 'soccer') return matchInSet(raw, window.SOCCER_PLAYERS);
+  return matchAnimal(raw);
+}
+
 function formatTime(seconds) {
   const s = Math.max(0, Math.ceil(seconds));
   const m = Math.floor(s / 60);
@@ -97,6 +123,8 @@ const MODE_LABELS = {
   ocean: 'Ocean animals only',
   dinosaurs: 'Dinosaurs only',
   letters: 'Letter-locked (rotates every 20s)',
+  nba: 'NBA Players (all-time)',
+  soccer: 'Soccer Players (all-time)',
 };
 
 // Deterministic per-round shuffle of A-Z, seeded from the match's start time
@@ -132,10 +160,12 @@ function currentLetterRound(startedAt) {
 }
 
 /** Whether a canonical (already-matched) animal name is a legal guess under
- *  the lobby's configured mode. Classic mode always returns true. */
+ *  the lobby's configured mode. Classic mode, and the two player-name modes
+ *  (nba/soccer, which have their own separate dictionaries with no further
+ *  restriction to apply) always return true. */
 function matchesMode(canonical, mode, startedAt) {
   mode = mode || 'classic';
-  if (mode === 'classic') return true;
+  if (mode === 'classic' || mode === 'nba' || mode === 'soccer') return true;
   if (mode === 'letters') {
     const { letter } = currentLetterRound(startedAt);
     return canonical.charAt(0).toUpperCase() === letter;

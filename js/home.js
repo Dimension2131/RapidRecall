@@ -1,3 +1,6 @@
+// Home screen: create a lobby or join one by code.
+// Waits for firebase-init.js (loaded just before this) to have populated window.__fb.
+
 function fb() { return window.__fb; }
 
 const usernameEl = document.getElementById('username');
