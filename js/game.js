@@ -1,32 +1,3 @@
-// Gameplay: waiting room -> live duel -> result screen -> optional rematch.
-//
-// SCORING MODEL: running out of time locks a player out of guessing but does
-// NOT end the match by itself. The match ends once BOTH players are "done"
-// (out of time, or one forfeits by disconnecting). Whoever named more
-// animals wins; equal counts is a draw.
-//
-// TIMER MODEL: each player has {baseTime, baseTimestamp}. Effective time =
-// baseTime - (now - baseTimestamp)/1000. Every guess resets the anchor.
-//
-// STREAK MODEL: consecutive correct guesses within STREAK_WINDOW_S build a
-// streak that raises the bonus per correct guess (capped). A wrong guess
-// resets the streak; a duplicate or mode-mismatched guess leaves it alone.
-//
-// MODES: classic (any real animal), a category mode (mammals/birds/ocean/
-// dinosaurs, checked against js/categories.js), or "letters" (must start
-// with whichever letter is currently active -- rotates every 20s, computed
-// deterministically from the match's startedAt so every client agrees
-// without needing to sync the rotation through the database).
-//
-// REMATCH / SERIES: after a match ends, both players vote. Once both vote
-// yes, a fresh round starts in the same lobby with the same settings, and a
-// running win/draw tally (the "series") persists across rounds. A player
-// declining ends the series.
-//
-// ADMIN: see admin.html / README for the (client-side-only) admin gate that
-// lets a signed-in admin spectate any lobby and overturn a log entry or
-// hand back time.
-
 const CORRECT_BONUS = 2;
 const WRONG_PENALTY = 5;
 const STREAK_WINDOW_S = 8;
