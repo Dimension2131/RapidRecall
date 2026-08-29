@@ -12,7 +12,7 @@ function isLive(status) { return status === 'active' || status === 'sudden_death
 
 function modeNoun(mode) {
   if (mode === 'nba') return 'NBA player';
-  if (mode === 'soccer') return 'soccer player';
+  if (mode === 'football') return 'football player';
   return 'animal';
 }
 
