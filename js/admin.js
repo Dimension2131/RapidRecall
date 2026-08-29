@@ -1,11 +1,3 @@
-// Client-side-only admin gate. There is no backend here (this is a static
-// site + Firebase RTDB), so this cannot be real authentication -- anyone who
-// reads this file can see the credentials and anyone with basic dev tools
-// could set the localStorage flag directly. It exists to give a designated
-// admin a quick, low-friction way to open the overturn/time-restore controls
-// in game.html, not to secure anything against a determined bad actor. If
-// you need real security, put this behind actual auth (e.g. Firebase Auth)
-// and enforce it in your database rules, not just in this JS file.
 const ADMIN_USERNAME = 'Dimension21';
 const ADMIN_PASSWORD = 'Test';
 
