@@ -159,13 +159,9 @@ function currentLetterRound(startedAt) {
   return { letter: seq[idx], secondsLeft: Math.ceil(LETTER_ROUND_SECONDS - into) };
 }
 
-/** Whether a canonical (already-matched) animal name is a legal guess under
- *  the lobby's configured mode. Classic mode, and the two player-name modes
- *  (nba/soccer, which have their own separate dictionaries with no further
- *  restriction to apply) always return true. */
 function matchesMode(canonical, mode, startedAt) {
   mode = mode || 'classic';
-  if (mode === 'classic' || mode === 'nba' || mode === 'soccer') return true;
+  if (mode === 'classic' || mode === 'nba' || mode === 'football') return true;
   if (mode === 'letters') {
     const { letter } = currentLetterRound(startedAt);
     return canonical.charAt(0).toUpperCase() === letter;
