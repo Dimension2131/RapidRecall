@@ -1,7 +1,4 @@
-// Shared helpers used by both the home screen and the game screen.
 
-/** Generate a short random client id, persisted per-browser so a page refresh
- *  can reconnect to the same lobby slot instead of registering as a 3rd player. */
 function getClientId() {
   let id = localStorage.getItem('aw_client_id');
   if (!id) {
