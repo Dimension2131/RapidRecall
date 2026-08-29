@@ -27,7 +27,7 @@
 
   <!-- Waiting room -->
   <div class="card" id="waiting-panel" style="display:none;">
-    <label class="field-label">Share this code with your opponent</label>
+    <label class="field-label">Share this code with the other explorer</label>
     <div class="code-plate">
       <div class="code-value" id="waiting-code">------</div>
     </div>
@@ -38,7 +38,7 @@
     <div class="spinner-row">
       <div class="dot-pulse"></div> Waiting for opponent to join…
     </div>
-    <p class="hint">Anyone else who enters this code once the duel starts will join as a spectator.</p>
+    <p class="hint">Anyone else who enters this code once the duel starts joins as a spectator.</p>
   </div>
 
   <!-- Main game -->
@@ -47,6 +47,10 @@
     <div class="letter-banner" id="letter-banner" style="display:none;">
       Current letter: <span class="letter-big" id="letter-current">A</span>
       <span id="letter-countdown">(20s)</span>
+    </div>
+
+    <div class="sudden-death-banner" id="sudden-death-banner" style="display:none;">
+      ⚡ Sudden death — tied score, 20s each, double points on every correct guess ⚡
     </div>
 
     <div class="players-row">
@@ -96,13 +100,14 @@
     <p class="hint" id="spectate-note" style="display:none;"></p>
 
     <form class="guess-form" id="guess-form" autocomplete="off">
-      <input type="text" id="guess-input" placeholder="Name an animal…" autocomplete="off" disabled>
+      <input type="text" id="guess-input" placeholder="Name an animal…" autocomplete="off"
+        autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" disabled>
       <button type="submit" class="btn btn-primary" id="guess-submit" disabled>Guess</button>
     </form>
     <div class="feedback-line" id="feedback"></div>
 
     <div class="log-card">
-      <div class="log-title"><span>Animal Log</span><span id="log-count">0 specimens</span></div>
+      <div class="log-title"><span>Field log</span><span id="log-count">0 specimens</span></div>
       <ul class="log-list" id="log-list">
         <li class="empty-log">No guesses yet — first correct animal starts the log.</li>
       </ul>
@@ -114,7 +119,7 @@
 <!-- Result overlay -->
 <div class="overlay" id="result-overlay" style="display:none;">
   <div class="result-card">
-    <div class="eyebrow">Game Over</div>
+    <div class="eyebrow">expedition complete</div>
     <h2 id="result-title">—</h2>
     <p class="hint" id="result-sub" style="margin-top:-6px;"></p>
     <div class="result-tally">

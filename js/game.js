@@ -34,6 +34,10 @@ const STREAK_BONUS_CAP = 5;
 const HARD_CAP_SECONDS = 900;
 const CIRC = 2 * Math.PI * 34;
 const DEFAULT_CLOCK = 120;
+const SUDDEN_DEATH_SECONDS = 20;
+const MAX_SUDDEN_DEATH_ROUNDS = 3;
+
+function isLive(status) { return status === 'active' || status === 'sudden_death'; }
 
 function fb() { return window.__fb; }
 function isAdmin() { return localStorage.getItem('aw_is_admin') === '1'; }
@@ -57,6 +61,7 @@ const els = {
   letterBanner: document.getElementById('letter-banner'),
   letterCurrent: document.getElementById('letter-current'),
   letterCountdown: document.getElementById('letter-countdown'),
+  suddenDeathBanner: document.getElementById('sudden-death-banner'),
   guessForm: document.getElementById('guess-form'),
   guessInput: document.getElementById('guess-input'),
   guessSubmit: document.getElementById('guess-submit'),
@@ -239,6 +244,14 @@ function attachLobbyListener() {
   });
 
   els.guessForm.addEventListener('submit', onSubmitGuess);
+  // Mobile fix: tapping the submit button normally steals focus from the
+  // text input, which dismisses the on-screen keyboard between guesses.
+  // Blocking the button's own focus-grab (it still fires 'click'/'submit'
+  // fine) keeps the keyboard up so players can fire off guesses back-to-back
+  // without it popping closed and reopening every time.
+  const preventFocusSteal = (e) => e.preventDefault();
+  els.guessSubmit.addEventListener('mousedown', preventFocusSteal);
+  els.guessSubmit.addEventListener('touchstart', preventFocusSteal, { passive: false });
   els.rematchYesBtn.addEventListener('click', () => castRematchVote(true));
   els.rematchNoBtn.addEventListener('click', () => castRematchVote(false));
   els.rematchRowSpectator.addEventListener('click', () => { window.location.href = 'index.html'; });
@@ -247,6 +260,7 @@ function attachLobbyListener() {
 }
 
 function clockSecondsFor(lobby) {
+  if (lobby?.status === 'sudden_death') return SUDDEN_DEATH_SECONDS;
   return lobby?.settings?.clockSeconds || DEFAULT_CLOCK;
 }
 
@@ -273,7 +287,7 @@ async function maybeStartGame(lobby) {
 }
 
 function watchOpponentDisconnect(lobby) {
-  if (lobby.status !== 'active') { if (disconnectTimer) { clearTimeout(disconnectTimer); disconnectTimer = null; } return; }
+  if (!isLive(lobby.status)) { if (disconnectTimer) { clearTimeout(disconnectTimer); disconnectTimer = null; } return; }
   const oppSlot = mySlot === 'p1' ? 'p2' : 'p1';
   const opp = lobby.players?.[oppSlot];
   if (opp && opp.connected === false && !disconnectTimer) {
@@ -312,7 +326,7 @@ function unbumpSeries(cur, winner) {
 function tick() {
   if (!latestLobby) return;
   render(latestLobby);
-  if (latestLobby.status !== 'active') return;
+  if (!isLive(latestLobby.status)) return;
 
   if (mySlot === 'p1' || mySlot === 'p2') {
     const clock = clockSecondsFor(latestLobby);
@@ -333,26 +347,51 @@ function tick() {
 async function reportDone(slot) {
   const { runTransaction } = fb();
   await runTransaction(lobbyRef, (cur) => {
-    if (!cur || cur.status !== 'active') return cur;
+    if (!cur || !isLive(cur.status)) return cur;
     cur.doneFlags = cur.doneFlags || {};
     if (cur.doneFlags[slot]) return cur;
     cur.doneFlags[slot] = true;
     if (cur.doneFlags.p1 && cur.doneFlags.p2) {
-      cur.status = 'finished';
-      cur.winner = computeWinner(cur);
-      cur.finishedAt = Date.now();
-      cur.endReason = 'time';
-      bumpSeries(cur, cur.winner);
+      resolveRoundEnd(cur);
     }
     return cur;
   });
+}
+
+// Called once both players are done, whether that's the end of the normal
+// round or a sudden-death round. If the score is tied and we haven't hit
+// the sudden-death round cap yet, kicks off another 20s sudden-death round
+// (fresh doneFlags, fresh 20s clocks, streaks cleared) instead of finishing.
+function resolveRoundEnd(cur) {
+  const winner = computeWinner(cur);
+  if (winner === 'draw') {
+    const round = (cur.suddenDeathRound || 0) + 1;
+    if (round <= MAX_SUDDEN_DEATH_ROUNDS) {
+      cur.suddenDeathRound = round;
+      cur.status = 'sudden_death';
+      cur.doneFlags = {};
+      const now = Date.now();
+      for (const slot of ['p1', 'p2']) {
+        if (!cur.players[slot]) continue;
+        cur.players[slot].baseTime = SUDDEN_DEATH_SECONDS;
+        cur.players[slot].baseTimestamp = now;
+        cur.players[slot].streak = 0;
+      }
+      return;
+    }
+  }
+  cur.status = 'finished';
+  cur.winner = winner;
+  cur.finishedAt = Date.now();
+  cur.endReason = cur.suddenDeathRound ? 'sudden_death' : 'time';
+  bumpSeries(cur, cur.winner);
 }
 
 async function reportForfeit(disconnectedSlot) {
   const { runTransaction } = fb();
   const winnerSlot = disconnectedSlot === 'p1' ? 'p2' : 'p1';
   await runTransaction(lobbyRef, (cur) => {
-    if (!cur || cur.status !== 'active') return cur;
+    if (!cur || !isLive(cur.status)) return cur;
     cur.status = 'finished';
     cur.winner = winnerSlot;
     cur.finishedAt = Date.now();
@@ -365,7 +404,7 @@ async function reportForfeit(disconnectedSlot) {
 async function forceEndByCap() {
   const { runTransaction } = fb();
   await runTransaction(lobbyRef, (cur) => {
-    if (!cur || cur.status !== 'active') return cur;
+    if (!cur || !isLive(cur.status)) return cur;
     cur.status = 'finished';
     cur.winner = computeWinner(cur);
     cur.finishedAt = Date.now();
@@ -390,12 +429,10 @@ function setDial(slot, seconds, clockSeconds) {
 
 function render(lobby) {
   const waiting = lobby.status === 'waiting';
-  const active = lobby.status === 'active' || lobby.status === 'finished';
+  const active = isLive(lobby.status) || lobby.status === 'finished';
   const clock = clockSecondsFor(lobby);
 
-  if (lobby.status === 'active') {
-    // Covers the "a new round just started via rematch" case -- the overlay
-    // from the previous round's result needs to close back out.
+  if (isLive(lobby.status)) {
     if (els.resultOverlay.style.display !== 'none') els.resultOverlay.style.display = 'none';
     resultShownForFinishedAt = null;
   }
@@ -420,6 +457,8 @@ function render(lobby) {
 
   if (lobby.status === 'finished') {
     els.mastheadTitle.textContent = 'Duel finished';
+  } else if (lobby.status === 'sudden_death') {
+    els.mastheadTitle.textContent = (mySlot === 'admin' ? 'Admin view — ' : '') + 'Sudden death! Double points';
   } else if (mySlot === 'admin') {
     els.mastheadTitle.textContent = 'Admin view';
   } else if (amSpectating) {
@@ -427,6 +466,7 @@ function render(lobby) {
   } else {
     els.mastheadTitle.textContent = 'Duel in progress';
   }
+  document.body.classList.toggle('is-sudden-death', lobby.status === 'sudden_death');
 
   // Letter-round banner
   if (lobby.settings?.mode === 'letters' && lobby.startedAt) {
@@ -437,6 +477,8 @@ function render(lobby) {
   } else {
     els.letterBanner.style.display = 'none';
   }
+
+  els.suddenDeathBanner.style.display = lobby.status === 'sudden_death' ? 'block' : 'none';
 
   for (const slot of ['p1', 'p2']) {
     const p = lobby.players?.[slot];
@@ -456,7 +498,7 @@ function render(lobby) {
 
   const iAmDone = amPlayer && (myDoneReported || (lobby.doneFlags && lobby.doneFlags[mySlot]));
   const gameOver = lobby.status === 'finished';
-  const canGuess = amPlayer && lobby.status === 'active' && !iAmDone;
+  const canGuess = amPlayer && isLive(lobby.status) && !iAmDone;
 
   els.guessForm.style.display = amPlayer ? 'flex' : 'none';
   if (els.spectateNote) {
@@ -541,13 +583,17 @@ async function onSubmitGuess(e) {
   const raw = els.guessInput.value;
   if (!raw.trim()) return;
   els.guessInput.value = '';
+  // Refocus immediately (synchronously, before the async DB round-trip) so
+  // a mobile keyboard that started to close from the tap snaps back open
+  // right away instead of visibly closing and reopening.
+  els.guessInput.focus();
 
   const { runTransaction } = fb();
   const canonical = matchAnimal(raw);
   const submittedAt = Date.now();
 
   const txResult = await runTransaction(lobbyRef, (cur) => {
-    if (!cur || cur.status !== 'active') return cur;
+    if (!cur || !isLive(cur.status)) return cur;
     const mine = cur.players?.[mySlot];
     if (!mine) return cur;
     const clock = clockSecondsFor(cur);
@@ -576,6 +622,7 @@ async function onSubmitGuess(e) {
       const newStreak = (priorStreak > 0 && gap <= STREAK_WINDOW_S) ? priorStreak + 1 : 1;
       const streakBonus = Math.min(STREAK_BONUS_CAP, newStreak - 1);
       delta = CORRECT_BONUS + streakBonus;
+      if (cur.status === 'sudden_death') delta *= 2; // double points in sudden death
       mine.streak = newStreak;
       mine.lastCorrectAt = now;
       mine.correct = (mine.correct || 0) + 1;
@@ -653,7 +700,9 @@ function showResult(lobby) {
   if (els.resultSub) {
     els.resultSub.textContent = lobby.endReason === 'forfeit'
       ? 'Decided by forfeit — opponent disconnected.'
-      : 'Decided by total animals named.';
+      : lobby.endReason === 'sudden_death'
+        ? 'Tied after time ran out — decided in sudden death (double points, 20s each).'
+        : 'Decided by total animals named.';
   }
 
   const amPlayer = mySlot === 'p1' || mySlot === 'p2';
@@ -721,6 +770,7 @@ function startNewRound(cur) {
   cur.log = {};
   cur.doneFlags = {};
   cur.rematchVotes = {};
+  cur.suddenDeathRound = 0;
   cur.series = cur.series || { wins: { p1: 0, p2: 0 }, draws: 0, round: 1 };
   cur.series.round = (cur.series.round || 1) + 1;
   for (const slot of ['p1', 'p2']) {
@@ -812,7 +862,7 @@ function reopenIfPositive(cur, slot, newTime) {
     cur.doneFlags[slot] = false;
     if (cur.status === 'finished' && cur.endReason !== 'forfeit') {
       unbumpSeries(cur, cur.winner);
-      cur.status = 'active';
+      cur.status = cur.endReason === 'sudden_death' ? 'sudden_death' : 'active';
       cur.winner = null;
       cur.finishedAt = null;
     }

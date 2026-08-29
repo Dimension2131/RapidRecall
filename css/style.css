@@ -554,6 +554,25 @@ body.is-admin .admin-only { display: flex; }
   line-height: 1;
 }
 
+.sudden-death-banner {
+  text-align: center;
+  margin: 4px 0 18px;
+  padding: 10px 16px;
+  background: rgba(161,61,43,0.12);
+  border: 1px solid var(--rust);
+  border-radius: 4px;
+  color: var(--rust);
+  font-family: 'Space Mono', monospace;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  animation: sd-pulse 1.4s ease-in-out infinite;
+}
+@keyframes sd-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
 /* ---------- rematch / series ---------- */
 
 .series-row {
