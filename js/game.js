@@ -223,6 +223,10 @@ function attachLobbyListener() {
   const preventFocusSteal = (e) => e.preventDefault();
   els.guessSubmit.addEventListener('mousedown', preventFocusSteal);
   els.guessSubmit.addEventListener('touchstart', preventFocusSteal, { passive: false });
+  els.guessSubmit.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  onSubmitGuess(e);
+  });
   els.rematchYesBtn.addEventListener('click', () => castRematchVote(true));
   els.rematchNoBtn.addEventListener('click', () => castRematchVote(false));
   els.rematchRowSpectator.addEventListener('click', () => { window.location.href = 'index.html'; });
