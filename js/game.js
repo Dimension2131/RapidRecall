@@ -10,9 +10,81 @@ const MAX_SUDDEN_DEATH_ROUNDS = 3;
 
 function isLive(status) { return status === 'active' || status === 'sudden_death'; }
 
+// ---------------- Lazy dictionary loading ----------------
+//
+// Only the animal dictionary + utils are loaded eagerly (see game.html) --
+// every other mode's dictionary (NBA, football, movies, actors, etc.) is
+// fetched on demand, starting the moment we know the lobby's mode (which
+// happens as soon as we read the lobby, typically well before the match
+// even starts -- see ensureDictionaryLoaded, called from render()). This
+// keeps the page load light regardless of how many categories the game
+// supports; it has no effect on the timer or gameplay once loaded, since
+// dictionary lookups are instant (Set.has()) no matter the dictionary size.
+const MODE_SCRIPTS = {
+  classic: ['animals.js'],
+  mammals: ['animals.js', 'categories.js'],
+  birds: ['animals.js', 'categories.js'],
+  ocean: ['animals.js', 'categories.js'],
+  dinosaurs: ['animals.js', 'categories.js'],
+  letters: ['animals.js'],
+  chain: ['animals.js'],
+  lengthlock: ['animals.js'],
+  nba: ['nba_players.js'],
+  football: ['football_players.js'],
+  countries: ['countries.js'],
+  movies: ['movies.js'],
+  tv_shows: ['tv_shows.js'],
+  artists: ['artists.js'],
+  actors: ['actors.js'],
+  superheroes: ['superheroes.js'],
+  cars: ['cars.js'],
+  food_drinks: ['food_drinks.js'],
+};
+
+const loadedScripts = new Set();
+let dictionaryReady = false;
+let dictionaryLoadFailed = false;
+let dictionaryLoadingFor = null; // mode currently being fetched, to avoid duplicate loads
+
+function loadScriptOnce(src) {
+  if (loadedScripts.has(src)) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => { loadedScripts.add(src); resolve(); };
+    s.onerror = () => reject(new Error('Failed to load ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function ensureDictionaryLoaded(mode) {
+  if (dictionaryReady && dictionaryLoadingFor === mode) return;
+  if (dictionaryLoadingFor === mode) return; // already in flight for this mode
+  dictionaryLoadingFor = mode;
+  dictionaryReady = false;
+  dictionaryLoadFailed = false;
+  const files = MODE_SCRIPTS[mode] || ['animals.js'];
+  try {
+    await Promise.all(files.map((f) => loadScriptOnce('js/' + f)));
+    dictionaryReady = true;
+  } catch (err) {
+    console.error(err);
+    dictionaryLoadFailed = true;
+  }
+  if (latestLobby) render(latestLobby);
+}
+
 function modeNoun(mode) {
   if (mode === 'nba') return 'NBA player';
   if (mode === 'football') return 'football player';
+  if (mode === 'countries') return 'country';
+  if (mode === 'movies') return 'movie';
+  if (mode === 'tv_shows') return 'TV show';
+  if (mode === 'artists') return 'artist';
+  if (mode === 'actors') return 'actor';
+  if (mode === 'superheroes') return 'superhero';
+  if (mode === 'cars') return 'car';
+  if (mode === 'food_drinks') return 'food or drink';
   return 'animal';
 }
 
@@ -421,8 +493,16 @@ function render(lobby) {
 
   if (lobby.settings) {
     const label = MODE_LABELS[lobby.settings.mode] || 'Classic';
-    els.modeBadge.textContent = `${label} · ${clock}s clock`;
+    const prefix = lobby.settings.wasMystery ? 'Mystery \u2192 ' : '';
+    els.modeBadge.textContent = `${prefix}${label} · ${clock}s clock`;
     els.modeBadge.style.display = 'inline-block';
+    // Kick off the mode's dictionary fetch as early as possible -- as soon
+    // as settings exist, which is from lobby creation, long before the
+    // match actually starts. dictionaryLoadingFor guards against re-firing
+    // this on every subsequent snapshot.
+    if (dictionaryLoadingFor !== lobby.settings.mode) {
+      ensureDictionaryLoaded(lobby.settings.mode);
+    }
   }
 
   els.waitingPanel.style.display = waiting ? 'block' : 'none';
@@ -480,7 +560,7 @@ function render(lobby) {
 
   const iAmDone = amPlayer && (myDoneReported || (lobby.doneFlags && lobby.doneFlags[mySlot]));
   const gameOver = lobby.status === 'finished';
-  const canGuess = amPlayer && isLive(lobby.status) && !iAmDone;
+  const canGuess = amPlayer && isLive(lobby.status) && !iAmDone && dictionaryReady;
 
   els.guessForm.style.display = amPlayer ? 'flex' : 'none';
   if (els.spectateNote) {
@@ -496,6 +576,10 @@ function render(lobby) {
   if (amPlayer) {
     if (gameOver) {
       els.guessInput.placeholder = 'Duel complete';
+    } else if (dictionaryLoadFailed) {
+      els.guessInput.placeholder = 'Could not load word list — check your connection';
+    } else if (!dictionaryReady) {
+      els.guessInput.placeholder = 'Loading word list…';
     } else if (iAmDone) {
       els.guessInput.placeholder = "You're out of time — waiting on your opponent…";
     } else {
@@ -562,6 +646,7 @@ function escapeHtml(s) {
 async function onSubmitGuess(e) {
   e.preventDefault();
   if (mySlot !== 'p1' && mySlot !== 'p2') return;
+  if (!dictionaryReady) return; // safety net; the input/button are disabled until ready anyway
   const raw = els.guessInput.value;
   if (!raw.trim()) return;
   els.guessInput.value = '';
@@ -594,7 +679,7 @@ async function onSubmitGuess(e) {
     } else if (cur.usedAnimals[canonical]) {
       result = 'dup';
       delta = 0;
-    } else if (!matchesMode(canonical, cur.settings?.mode, cur.startedAt)) {
+    } else if (!passesPlayerConstraint(canonical, cur.settings?.mode, mine, { ...cur.settings, startedAt: cur.startedAt })) {
       result = 'mode-mismatch';
       delta = 0;
     } else {
@@ -609,6 +694,10 @@ async function onSubmitGuess(e) {
       mine.lastCorrectAt = now;
       mine.correct = (mine.correct || 0) + 1;
       cur.usedAnimals[canonical] = mySlot;
+      if (cur.settings?.mode === 'chain') {
+        // Next guess must start with the last letter of this one.
+        mine.chainLetter = canonical.charAt(canonical.length - 1).toUpperCase();
+      }
     }
 
     mine.baseTime = curTime + delta;
@@ -764,6 +853,7 @@ function startNewRound(cur) {
     cur.players[slot].wrong = 0;
     cur.players[slot].streak = 0;
     delete cur.players[slot].lastCorrectAt;
+    delete cur.players[slot].chainLetter;
   }
 }
 

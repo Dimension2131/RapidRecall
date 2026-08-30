@@ -98,12 +98,21 @@ function matchInSet(raw, set) {
 
 /** Given a mode key, returns the right verifier function's result for a raw
  *  guess: the matched canonical form, or null if it's not a real entry in
- *  that mode's underlying dictionary. Category/letter modes still draw from
- *  ANIMAL_SET (matchesMode below layers the extra restriction on top);
- *  'nba' and 'soccer' draw from their own separate name dictionaries. */
+ *  that mode's underlying dictionary. Category/letter/chain/lengthlock modes
+ *  still draw from ANIMAL_SET (matchesMode / passesConstraint layer the
+ *  extra restriction on top); the rest draw from their own separate
+ *  dictionaries. */
 function matchForMode(raw, mode) {
   if (mode === 'nba') return matchInSet(raw, window.NBA_PLAYERS);
   if (mode === 'football') return matchInSet(raw, window.FOOTBALL_PLAYERS);
+  if (mode === 'countries') return matchInSet(raw, window.COUNTRIES);
+  if (mode === 'movies') return matchInSet(raw, window.MOVIES);
+  if (mode === 'tv_shows') return matchInSet(raw, window.TV_SHOWS);
+  if (mode === 'artists') return matchInSet(raw, window.ARTISTS);
+  if (mode === 'actors') return matchInSet(raw, window.ACTORS);
+  if (mode === 'superheroes') return matchInSet(raw, window.SUPERHEROES);
+  if (mode === 'cars') return matchInSet(raw, window.CARS);
+  if (mode === 'food_drinks') return matchInSet(raw, window.FOOD_DRINKS);
   return matchAnimal(raw);
 }
 
@@ -123,9 +132,33 @@ const MODE_LABELS = {
   ocean: 'Ocean animals only',
   dinosaurs: 'Dinosaurs only',
   letters: 'Letter-locked (rotates every 20s)',
+  chain: 'Chain (start with the last letter of your last animal)',
+  lengthlock: 'Length-locked (exact letter count)',
   nba: 'NBA Players (all-time)',
   football: 'Football Players (all-time)',
+  countries: 'Countries',
+  movies: 'Movies',
+  tv_shows: 'TV Shows',
+  artists: 'Artists (musicians/bands)',
+  actors: 'Actors',
+  superheroes: 'Superheroes (Marvel, DC & more)',
+  cars: 'Cars',
+  food_drinks: 'Food & Drinks',
 };
+
+// Mode keys eligible for Mystery Category to roll from -- the animal
+// "modifier" modes (letters/chain/lengthlock) are left out since they're
+// mechanics layered on classic animals rather than distinct content pools,
+// and would make Mystery mostly just re-roll animal variants.
+const MYSTERY_POOL = [
+  'classic', 'mammals', 'birds', 'ocean', 'dinosaurs',
+  'nba', 'football', 'countries', 'movies', 'tv_shows',
+  'artists', 'actors', 'superheroes', 'cars', 'food_drinks',
+];
+
+function rollMysteryMode() {
+  return MYSTERY_POOL[Math.floor(Math.random() * MYSTERY_POOL.length)];
+}
 
 // Deterministic per-round shuffle of A-Z, seeded from the match's start time
 // so every client (both players + any spectators/admin) computes the exact
@@ -161,11 +194,35 @@ function currentLetterRound(startedAt) {
 
 function matchesMode(canonical, mode, startedAt) {
   mode = mode || 'classic';
-  if (mode === 'classic' || mode === 'nba' || mode === 'football') return true;
+  if (mode === 'classic' || mode === 'nba' || mode === 'football' ||
+      mode === 'countries' || mode === 'movies' || mode === 'tv_shows' ||
+      mode === 'artists' || mode === 'actors' || mode === 'superheroes' ||
+      mode === 'cars' || mode === 'food_drinks') {
+    return true;
+  }
   if (mode === 'letters') {
     const { letter } = currentLetterRound(startedAt);
     return canonical.charAt(0).toUpperCase() === letter;
   }
   const set = window.CATEGORY_SETS && window.CATEGORY_SETS[mode];
   return set ? set.has(canonical) : true;
+}
+
+/** Chain mode and length-lock mode need per-player mutable state (the
+ *  required next starting letter; a configured exact length) rather than
+ *  something derivable purely from the lobby's mode + startedAt, so they're
+ *  checked here against the specific player's record instead of folded into
+ *  matchesMode above. Returns true/false; game.js calls this for those two
+ *  modes specifically and falls back to matchesMode for everything else. */
+function passesPlayerConstraint(canonical, mode, player, settings) {
+  if (mode === 'chain') {
+    if (!player || !player.chainLetter) return true; // first guess of the game is free
+    return canonical.charAt(0).toUpperCase() === player.chainLetter;
+  }
+  if (mode === 'lengthlock') {
+    const required = (settings && settings.requiredLength) || 5;
+    const bare = canonical.replace(/\s+/g, '');
+    return bare.length === required;
+  }
+  return matchesMode(canonical, mode, settings && settings.startedAt);
 }

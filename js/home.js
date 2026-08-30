@@ -14,6 +14,28 @@ const joinCodeEl = document.getElementById('join-code');
 const joinErrorEl = document.getElementById('join-error');
 const joinBtn = document.getElementById('join-btn');
 const dictCountEl = document.getElementById('dict-count');
+const animalsSubmodes = document.getElementById('animals-submodes');
+const sportsSubmodes = document.getElementById('sports-submodes');
+const lengthlockConfig = document.getElementById('lengthlock-config');
+const lengthInput = document.getElementById('length-input');
+
+// Top-level category -> sub-picker visibility, since Animals and Sports are
+// the only two categories with further sub-modes (per the request that
+// grouped NBA/Football under Sports and the animal variants under Animals;
+// every other category is a single flat dictionary with no sub-choice).
+document.querySelectorAll('input[name="category"]').forEach((el) => {
+  el.addEventListener('change', () => {
+    const val = document.querySelector('input[name="category"]:checked')?.value;
+    animalsSubmodes.style.display = val === 'animals' ? 'block' : 'none';
+    sportsSubmodes.style.display = val === 'sports' ? 'block' : 'none';
+  });
+});
+document.querySelectorAll('input[name="mode"]').forEach((el) => {
+  el.addEventListener('change', () => {
+    const val = document.querySelector('input[name="mode"]:checked')?.value;
+    lengthlockConfig.style.display = val === 'lengthlock' ? 'block' : 'none';
+  });
+});
 
 usernameEl.value = getSavedUsername();
 if (window.ANIMAL_SET) {
@@ -65,7 +87,28 @@ setupBackBtn.addEventListener('click', () => {
 setupConfirmBtn.addEventListener('click', async () => {
   const name = requireUsername();
   if (!name) return;
-  const mode = document.querySelector('input[name="mode"]:checked')?.value || 'classic';
+
+  const category = document.querySelector('input[name="category"]:checked')?.value || 'animals';
+  let mode;
+  let wasMystery = false;
+  let requiredLength = null;
+
+  if (category === 'animals') {
+    mode = document.querySelector('input[name="mode"]:checked')?.value || 'classic';
+    if (mode === 'lengthlock') {
+      requiredLength = Math.min(15, Math.max(3, parseInt(lengthInput.value, 10) || 5));
+    }
+  } else if (category === 'sports') {
+    mode = document.querySelector('input[name="sport"]:checked')?.value || 'nba';
+  } else if (category === 'mystery') {
+    mode = rollMysteryMode();
+    wasMystery = true;
+    if (mode === 'lengthlock') requiredLength = 5; // shouldn't occur (excluded from pool), but stay safe
+  } else {
+    // countries / movies / tv_shows / artists / actors / superheroes / cars: category value IS the mode key
+    mode = category;
+  }
+
   const clockSeconds = parseInt(document.querySelector('input[name="clock"]:checked')?.value || '120', 10);
 
   setupConfirmBtn.disabled = true;
@@ -74,13 +117,16 @@ setupConfirmBtn.addEventListener('click', async () => {
     const { db, ref, set, serverTimestamp } = fb();
     const code = await findFreeCode();
     const clientId = getClientId();
+    const settings = { mode, clockSeconds };
+    if (wasMystery) settings.wasMystery = true;
+    if (requiredLength) settings.requiredLength = requiredLength;
     await set(ref(db, 'lobbies/' + code), {
       createdAt: serverTimestamp(),
       status: 'waiting',
       winner: null,
       usedAnimals: {},
       log: {},
-      settings: { mode, clockSeconds },
+      settings,
       series: { wins: { p1: 0, p2: 0 }, draws: 0, round: 1 },
       players: {
         p1: { name, clientId, connected: true, correct: 0, wrong: 0 }
