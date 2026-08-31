@@ -1,10 +1,9 @@
 window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSyAiiYMMQ3uWX1MtBvkl5971BAi1lhO1xB8",
-  authDomain: "fauna-duel.firebaseapp.com",
-  databaseURL: "https://fauna-duel-default-rtdb.firebaseio.com",
-  projectId: "fauna-duel",
-  storageBucket: "fauna-duel.firebasestorage.app",
-  messagingSenderId: "407063460913",
-  appId: "1:407063460913:web:a8524f268269a9dc556910",
-  measurementId: "G-FZN3TZ01WH"
+  apiKey: "AIzaSyBQuFV3p_t2xeId9hmhptqfzeJaY4Rk3ns",
+  authDomain: "rapid-recall-4f8c1.firebaseapp.com",
+  databaseURL: "https://rapid-recall-4f8c1-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "rapid-recall-4f8c1",
+  storageBucket: "rapid-recall-4f8c1.firebasestorage.app",
+  messagingSenderId: "39674594209",
+  appId: "1:39674594209:web:dd21cfddcf227f267281e0"
 };
