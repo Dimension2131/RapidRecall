@@ -135,6 +135,28 @@ button {
   padding: 32px 20px 60px;
 }
 
+.home-link {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  z-index: 2;
+
+  font-family: 'Fira Code', monospace;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: rgba(229, 225, 212, 0.02);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.home-link:hover {
+  color: var(--ink);
+  border-color: var(--brass);
+}
+
 .masthead {
   width: 100%;
   max-width: 620px;
@@ -224,7 +246,8 @@ button {
 }
 
 input[type="text"],
-input[type="password"] {
+input[type="password"],
+input[type="number"] {
   width: 100%;
 
   font-family: 'Manrope', sans-serif;
@@ -253,7 +276,8 @@ input[type="password"]::placeholder {
 }
 
 input[type="text"]:focus,
-input[type="password"]:focus {
+input[type="password"]:focus,
+input[type="number"]:focus {
   border-color: var(--brass);
   background: #22261f;
   box-shadow: 0 0 0 3px rgba(185, 149, 80, 0.09);
@@ -446,7 +470,7 @@ a:focus-visible,
 
 .players-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
 
   margin-bottom: 22px;
@@ -770,6 +794,16 @@ body.is-admin .admin-only {
   color: var(--brass-light);
 }
 
+.log-tag.p3 {
+  background: rgba(122, 155, 180, 0.16);
+  color: #8fb8d8;
+}
+
+.log-tag.p4 {
+  background: rgba(180, 122, 155, 0.16);
+  color: #d88fb8;
+}
+
 .log-word {
   flex: 1;
   text-transform: capitalize;
@@ -1063,7 +1097,9 @@ body.is-admin .admin-only {
 
 .result-tally {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-around;
+  gap: 14px 10px;
 
   margin: 20px 0 26px;
 
@@ -1084,6 +1120,92 @@ body.is-admin .admin-only {
   font-size: 26px;
   font-weight: 600;
   color: var(--ink);
+}
+
+.result-tally .is-winner .score {
+  color: var(--brass);
+}
+
+.result-tally .is-winner .who {
+  color: var(--brass-light);
+}
+
+/* ---------- waiting room player list ---------- */
+
+.waiting-players {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.waiting-players li {
+  font-family: 'Fira Code', monospace;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  background: rgba(229, 225, 212, 0.02);
+}
+
+.waiting-players li.joined {
+  color: var(--ink);
+  border-color: rgba(111, 138, 104, 0.4);
+  background: rgba(111, 138, 104, 0.08);
+}
+
+.waiting-players li.open {
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.become-spectator-btn {
+  margin-top: 14px;
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.become-spectator-btn:hover {
+  color: var(--ink);
+}
+
+.in-game-actions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin: -8px 0 16px;
+}
+
+.leave-game-btn,
+.admin-end-game-btn {
+  background: none;
+  border: none;
+  font-family: 'Fira Code', monospace;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.leave-game-btn {
+  color: var(--ink-soft);
+}
+.leave-game-btn:hover {
+  color: var(--rust, #c0564a);
+}
+
+.admin-end-game-btn {
+  color: var(--brass-light);
+}
+.admin-end-game-btn:hover {
+  color: var(--rust, #c0564a);
 }
 
 

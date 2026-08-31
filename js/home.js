@@ -110,6 +110,7 @@ setupConfirmBtn.addEventListener('click', async () => {
   }
 
   const clockSeconds = parseInt(document.querySelector('input[name="clock"]:checked')?.value || '120', 10);
+  const maxPlayers = Math.min(4, Math.max(2, parseInt(document.querySelector('input[name="players"]:checked')?.value || '2', 10)));
 
   setupConfirmBtn.disabled = true;
   setupConfirmBtn.textContent = 'Creating…';
@@ -117,7 +118,7 @@ setupConfirmBtn.addEventListener('click', async () => {
     const { db, ref, set, serverTimestamp } = fb();
     const code = await findFreeCode();
     const clientId = getClientId();
-    const settings = { mode, clockSeconds };
+    const settings = { mode, clockSeconds, maxPlayers };
     if (wasMystery) settings.wasMystery = true;
     if (requiredLength) settings.requiredLength = requiredLength;
     await set(ref(db, 'lobbies/' + code), {
@@ -127,7 +128,7 @@ setupConfirmBtn.addEventListener('click', async () => {
       usedAnimals: {},
       log: {},
       settings,
-      series: { wins: { p1: 0, p2: 0 }, draws: 0, round: 1 },
+      series: { wins: {}, draws: 0, round: 1 },
       players: {
         p1: { name, clientId, connected: true, correct: 0, wrong: 0 }
       }

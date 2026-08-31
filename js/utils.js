@@ -30,13 +30,29 @@ function generateLobbyCode() {
  *  useful for player names), strip hyphens and periods (so "aye-aye" /
  *  "aye aye" and "A.J." / "AJ" all match identically), collapse whitespace,
  *  drop a leading article, strip surrounding punctuation. */
-function normalizeGuess(raw) {
+/** Normalize a raw guess for dictionary + duplicate lookup:
+ *  lowercase, trim, fold accents (so "Ümit" and "Umit" match identically --
+ *  useful for player names), strip hyphens and periods (so "aye-aye" /
+ *  "aye aye" and "A.J." / "AJ" all match identically), collapse whitespace,
+ *  strip surrounding punctuation.
+ *
+ *  Leading-article stripping ("a"/"an"/"the") is OPTIONAL and OFF by
+ *  default -- pass { stripArticle: true } for animal guesses, where "a
+ *  lion" and "lion" obviously mean the same thing. For proper names/titles
+ *  (movies, TV shows, artists, etc.) the article is often semantically
+ *  part of the actual name -- "The Boys" is a specific, different show
+ *  from any hypothetical show just called "Boys" -- so stripping it there
+ *  would incorrectly collapse two different real answers into one. */
+function normalizeGuess(raw, opts) {
+  opts = opts || {};
   let s = (raw || '').toLowerCase().trim();
   s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // fold accents
   s = s.replace(/-/g, ' ');
   s = s.replace(/\./g, '');
   s = s.replace(/\s+/g, ' ');
-  s = s.replace(/^(a|an|the)\s+/, '');
+  if (opts.stripArticle) {
+    s = s.replace(/^(a|an|the)\s+/, '');
+  }
   s = s.replace(/^[^a-z0-9']+|[^a-z0-9']+$/g, '');
   return s;
 }
@@ -78,7 +94,7 @@ function candidateForms(norm) {
  *  the de-duplication key means "wolf" and "wolves" are treated as the same
  *  already-used animal. */
 function matchAnimal(raw) {
-  const norm = normalizeGuess(raw);
+  const norm = normalizeGuess(raw, { stripArticle: true });
   if (!norm) return null;
   for (const form of candidateForms(norm)) {
     if (window.ANIMAL_SET.has(form)) return form;
@@ -86,12 +102,13 @@ function matchAnimal(raw) {
   return null;
 }
 
-/** Exact-match lookup for name dictionaries (NBA/soccer players) where,
- *  unlike animal names, there's no singular/plural to reconcile -- a full
- *  name either matches an entry or it doesn't. */
+/** Exact-match lookup for name/title dictionaries (NBA/football/movies/etc.)
+ *  where, unlike animal names, there's no singular/plural to reconcile --
+ *  a full name either matches an entry or it doesn't -- and articles are
+ *  NOT stripped, since they're often part of the actual name. */
 function matchInSet(raw, set) {
   if (!set) return null;
-  const norm = normalizeGuess(raw);
+  const norm = normalizeGuess(raw, { stripArticle: false });
   if (!norm) return null;
   return set.has(norm) ? norm : null;
 }

@@ -9,6 +9,7 @@
 <body>
 <div class="page">
 
+  <a href="index.html" class="home-link">← Home</a>
   <div class="masthead">
     <div class="eyebrow">lobby <span id="code-eyebrow" class="mono"></span></div>
     <h1 id="masthead-title">Rapid Recall</h1>
@@ -27,7 +28,7 @@
 
   <!-- Waiting room -->
   <div class="card" id="waiting-panel" style="display:none;">
-    <label class="field-label">Share this code with your opponent</label>
+    <label class="field-label">Share this code with the other players</label>
     <div class="code-plate">
       <div class="code-value" id="waiting-code">------</div>
     </div>
@@ -35,9 +36,11 @@
       <button class="btn btn-secondary" id="copy-code-btn">Copy code</button>
       <button class="btn btn-secondary" id="copy-link-btn">Copy link</button>
     </div>
-    <div class="spinner-row">
-      <div class="dot-pulse"></div> Waiting for opponent to join…
+    <ul class="waiting-players" id="waiting-players"></ul>
+    <div class="spinner-row" id="waiting-spinner-row">
+      <div class="dot-pulse"></div> <span id="waiting-status-text">Waiting for players…</span>
     </div>
+    <button class="become-spectator-btn" id="become-spectator-btn" style="display:none;">Switch to spectator instead</button>
     <p class="hint">Anyone else who enters this code once the duel starts joins as a spectator.</p>
   </div>
 
@@ -53,48 +56,11 @@
       ⚡ Sudden death — tied score, 20s each, double points on every correct guess ⚡
     </div>
 
-    <div class="players-row">
-      <div class="player-panel" id="panel-p1">
-        <div class="p-name"><span id="name-p1">Player 1</span><span class="you-tag" id="you-tag-p1" style="display:none;">YOU</span></div>
-        <div class="timer-dial-wrap">
-          <div class="timer-dial">
-            <svg viewBox="0 0 80 80">
-              <circle class="timer-track" cx="40" cy="40" r="34" fill="none" stroke-width="7"></circle>
-              <circle class="timer-fill" id="dial-p1" cx="40" cy="40" r="34" fill="none" stroke-width="7" stroke-dasharray="213.6" stroke-dashoffset="0"></circle>
-              <text x="40" y="45" text-anchor="middle" class="timer-num" transform="rotate(90 40 40)" id="dial-num-p1">2:00</text>
-            </svg>
-          </div>
-          <div class="stat-block">
-            <div class="time-value" id="time-p1">2:00</div>
-            <div class="counts" id="counts-p1">0 correct · 0 wrong</div>
-            <div class="admin-time-row admin-only" id="admin-time-p1">
-              <button type="button" class="admin-mini-btn admin-minus">−5s</button>
-              <button type="button" class="admin-mini-btn admin-plus">+5s</button>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="players-row" id="players-row"></div>
 
-      <div class="player-panel" id="panel-p2">
-        <div class="p-name"><span id="name-p2">Player 2</span><span class="you-tag" id="you-tag-p2" style="display:none;">YOU</span></div>
-        <div class="timer-dial-wrap">
-          <div class="timer-dial">
-            <svg viewBox="0 0 80 80">
-              <circle class="timer-track" cx="40" cy="40" r="34" fill="none" stroke-width="7"></circle>
-              <circle class="timer-fill" id="dial-p2" cx="40" cy="40" r="34" fill="none" stroke-width="7" stroke-dasharray="213.6" stroke-dashoffset="0"></circle>
-              <text x="40" y="45" text-anchor="middle" class="timer-num" transform="rotate(90 40 40)" id="dial-num-p2">2:00</text>
-            </svg>
-          </div>
-          <div class="stat-block">
-            <div class="time-value" id="time-p2">2:00</div>
-            <div class="counts" id="counts-p2">0 correct · 0 wrong</div>
-            <div class="admin-time-row admin-only" id="admin-time-p2">
-              <button type="button" class="admin-mini-btn admin-minus">−5s</button>
-              <button type="button" class="admin-mini-btn admin-plus">+5s</button>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="in-game-actions">
+      <button class="admin-end-game-btn" id="admin-end-game-btn" style="display:none;">End game (admin)</button>
+      <button class="leave-game-btn" id="leave-game-btn" style="display:none;">Leave game</button>
     </div>
 
     <p class="hint" id="spectate-note" style="display:none;"></p>
@@ -122,16 +88,7 @@
     <div class="eyebrow">duel complete</div>
     <h2 id="result-title">—</h2>
     <p class="hint" id="result-sub" style="margin-top:-6px;"></p>
-    <div class="result-tally">
-      <div>
-        <div class="who" id="result-name-p1">Player 1</div>
-        <div class="score" id="result-score-p1">0</div>
-      </div>
-      <div>
-        <div class="who" id="result-name-p2">Player 2</div>
-        <div class="score" id="result-score-p2">0</div>
-      </div>
-    </div>
+    <div class="result-tally" id="result-tally"></div>
     <div class="series-row" id="series-row"></div>
     <div class="rematch-row" id="rematch-row-player" style="display:none;">
       <button class="btn btn-primary" id="rematch-yes-btn">Rematch</button>
