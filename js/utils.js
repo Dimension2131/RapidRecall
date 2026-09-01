@@ -29,11 +29,6 @@ function generateLobbyCode() {
  *  lowercase, trim, fold accents (so "Ümit" and "Umit" match identically --
  *  useful for player names), strip hyphens and periods (so "aye-aye" /
  *  "aye aye" and "A.J." / "AJ" all match identically), collapse whitespace,
- *  drop a leading article, strip surrounding punctuation. */
-/** Normalize a raw guess for dictionary + duplicate lookup:
- *  lowercase, trim, fold accents (so "Ümit" and "Umit" match identically --
- *  useful for player names), strip hyphens and periods (so "aye-aye" /
- *  "aye aye" and "A.J." / "AJ" all match identically), collapse whitespace,
  *  strip surrounding punctuation.
  *
  *  Leading-article stripping ("a"/"an"/"the") is OPTIONAL and OFF by
@@ -119,7 +114,9 @@ function matchInSet(raw, set) {
  *  still draw from ANIMAL_SET (matchesMode / passesConstraint layer the
  *  extra restriction on top); the rest draw from their own separate
  *  dictionaries. */
-function matchForMode(raw, mode) {
+function isPokemonMode(mode) { return typeof mode === 'string' && mode.indexOf('pokemon') === 0; }
+
+function matchForMode(raw, mode, settings) {
   if (mode === 'nba') return matchInSet(raw, window.NBA_PLAYERS);
   if (mode === 'football') return matchInSet(raw, window.FOOTBALL_PLAYERS);
   if (mode === 'countries') return matchInSet(raw, window.COUNTRIES);
@@ -130,7 +127,41 @@ function matchForMode(raw, mode) {
   if (mode === 'superheroes') return matchInSet(raw, window.SUPERHEROES);
   if (mode === 'cars') return matchInSet(raw, window.CARS);
   if (mode === 'food_drinks') return matchInSet(raw, window.FOOD_DRINKS);
+  if (isPokemonMode(mode)) return matchInSet(raw, window.POKEMON_SET);
   return matchAnimal(raw);
+}
+
+/** The extra restriction for Pokemon sub-modes, checked against
+ *  window.POKEMON_META (types/gen/evolution-stage/legendary-mythical-UB). */
+function matchesPokemonMode(canonical, mode, settings) {
+  const meta = window.POKEMON_META && window.POKEMON_META[canonical];
+  if (mode === 'pokemon_classic') return true;
+  if (!meta) return false; // shouldn't happen -- POKEMON_SET and POKEMON_META share keys
+  if (mode === 'pokemon_basic') return meta.stage === 'basic';
+  if (mode === 'pokemon_stage1') return meta.stage === 'stage1';
+  if (mode === 'pokemon_stage2') return meta.stage === 'stage2';
+  if (mode === 'pokemon_stage') {
+    const required = settings && settings.pokemonStage;
+    return meta.stage === required;
+  }
+  if (mode === 'pokemon_monotype') return (meta.types || []).length === 1;
+  if (mode === 'pokemon_legendary') return !!meta.special;
+  if (mode === 'pokemon_type') return (meta.types || []).includes((settings && settings.pokemonType) || '');
+  if (mode === 'pokemon_gen') return meta.gen === (settings && settings.pokemonGen);
+  // Rotating modes
+  if (mode === 'pokemon_type_locked') {
+    const { type } = currentTypeRound(settings && settings.startedAt);
+    return (meta.types || []).includes(type);
+  }
+  if (mode === 'pokemon_gen_locked') {
+    const { gen } = currentGenRound(settings && settings.startedAt);
+    return meta.gen === gen;
+  }
+  if (mode === 'pokemon_letters') {
+    const { letter } = currentLetterRound(settings && settings.startedAt);
+    return canonical.charAt(0).toUpperCase() === letter;
+  }
+  return true;
 }
 
 function formatTime(seconds) {
@@ -161,6 +192,19 @@ const MODE_LABELS = {
   superheroes: 'Superheroes (Marvel, DC & more)',
   cars: 'Cars',
   food_drinks: 'Food & Drinks',
+  pokemon_classic: 'Pok\u00e9mon: Classic (all Pok\u00e9mon)',
+  pokemon_basic: 'Pok\u00e9mon: Basic only',
+  pokemon_stage1: 'Pok\u00e9mon: Stage 1 only',
+  pokemon_stage2: 'Pok\u00e9mon: Stage 2 / Final only',
+  pokemon_stage: 'Pok\u00e9mon: Stage-locked',
+  pokemon_monotype: 'Pok\u00e9mon: Single-type only',
+  pokemon_legendary: 'Pok\u00e9mon: Legendary/Mythical/Ultra Beast',
+  pokemon_type: 'Pok\u00e9mon: Certain type',
+  pokemon_gen: 'Pok\u00e9mon: Certain generation',
+  pokemon_letters: 'Pok\u00e9mon: Letter-locked',
+  pokemon_type_locked: 'Pok\u00e9mon: Type-locked (rotates every 20s)',
+  pokemon_gen_locked: 'Pok\u00e9mon: Generation-locked (rotates every 20s)',
+  pokemon_chain: 'Pok\u00e9mon: Chain',
 };
 
 // Mode keys eligible for Mystery Category to roll from -- the animal
@@ -171,20 +215,23 @@ const MYSTERY_POOL = [
   'classic', 'mammals', 'birds', 'ocean', 'dinosaurs',
   'nba', 'football', 'countries', 'movies', 'tv_shows',
   'artists', 'actors', 'superheroes', 'cars', 'food_drinks',
+  'pokemon_classic', 'pokemon_basic', 'pokemon_stage1', 'pokemon_stage2',
+  'pokemon_monotype', 'pokemon_legendary',
 ];
 
 function rollMysteryMode() {
   return MYSTERY_POOL[Math.floor(Math.random() * MYSTERY_POOL.length)];
 }
 
-// Deterministic per-round shuffle of A-Z, seeded from the match's start time
-// so every client (both players + any spectators/admin) computes the exact
-// same letter sequence without needing to sync it through the database.
+// ---------- Deterministic sequences for rotating constraints ----------
+
+const LETTER_ROUND_SECONDS = 20;
+
+// Letter sequence (A-Z shuffled)
 function seededLetterSequence(seed) {
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   let s = seed >>> 0;
   function rand() {
-    // mulberry32
     s |= 0; s = (s + 0x6D2B79F5) | 0;
     let t = Math.imul(s ^ (s >>> 15), 1 | s);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
@@ -197,10 +244,6 @@ function seededLetterSequence(seed) {
   return letters;
 }
 
-const LETTER_ROUND_SECONDS = 20;
-
-/** Given a match's startedAt timestamp, returns the currently-active letter
- *  for the "letters" mode, plus seconds remaining until it rotates. */
 function currentLetterRound(startedAt) {
   const seq = seededLetterSequence(startedAt || 0);
   const elapsed = Math.max(0, (Date.now() - (startedAt || Date.now())) / 1000);
@@ -208,6 +251,64 @@ function currentLetterRound(startedAt) {
   const into = elapsed % LETTER_ROUND_SECONDS;
   return { letter: seq[idx], secondsLeft: Math.ceil(LETTER_ROUND_SECONDS - into) };
 }
+
+// Type sequence (18 types, shuffled)
+const POKEMON_TYPES = [
+  'normal', 'fire', 'water', 'electric', 'grass', 'ice',
+  'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug',
+  'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'
+];
+
+function seededTypeSequence(seed) {
+  const types = [...POKEMON_TYPES];
+  let s = seed >>> 0;
+  function rand() {
+    s |= 0; s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  for (let i = types.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [types[i], types[j]] = [types[j], types[i]];
+  }
+  return types;
+}
+
+function currentTypeRound(startedAt) {
+  const seq = seededTypeSequence(startedAt || 0);
+  const elapsed = Math.max(0, (Date.now() - (startedAt || Date.now())) / 1000);
+  const idx = Math.floor(elapsed / LETTER_ROUND_SECONDS) % seq.length;
+  const into = elapsed % LETTER_ROUND_SECONDS;
+  return { type: seq[idx], secondsLeft: Math.ceil(LETTER_ROUND_SECONDS - into) };
+}
+
+// Generation sequence (1-9, shuffled)
+function seededGenSequence(seed) {
+  const gens = [1,2,3,4,5,6,7,8,9];
+  let s = seed >>> 0;
+  function rand() {
+    s |= 0; s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  for (let i = gens.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [gens[i], gens[j]] = [gens[j], gens[i]];
+  }
+  return gens;
+}
+
+function currentGenRound(startedAt) {
+  const seq = seededGenSequence(startedAt || 0);
+  const elapsed = Math.max(0, (Date.now() - (startedAt || Date.now())) / 1000);
+  const idx = Math.floor(elapsed / LETTER_ROUND_SECONDS) % seq.length;
+  const into = elapsed % LETTER_ROUND_SECONDS;
+  return { gen: seq[idx], secondsLeft: Math.ceil(LETTER_ROUND_SECONDS - into) };
+}
+
+// ---------- Mode and constraint checking ----------
 
 function matchesMode(canonical, mode, startedAt) {
   mode = mode || 'classic';
@@ -232,7 +333,7 @@ function matchesMode(canonical, mode, startedAt) {
  *  matchesMode above. Returns true/false; game.js calls this for those two
  *  modes specifically and falls back to matchesMode for everything else. */
 function passesPlayerConstraint(canonical, mode, player, settings) {
-  if (mode === 'chain') {
+  if (mode === 'chain' || mode === 'pokemon_chain') {
     if (!player || !player.chainLetter) return true; // first guess of the game is free
     return canonical.charAt(0).toUpperCase() === player.chainLetter;
   }
@@ -241,5 +342,13 @@ function passesPlayerConstraint(canonical, mode, player, settings) {
     const bare = canonical.replace(/\s+/g, '');
     return bare.length === required;
   }
+  if (isPokemonMode(mode)) {
+    return matchesPokemonMode(canonical, mode, settings);
+  }
   return matchesMode(canonical, mode, settings && settings.startedAt);
+}
+
+// ----- helpers for display -----
+function capitalize(s) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }

@@ -21,8 +21,8 @@
 // resets the streak; a duplicate or mode-mismatched guess leaves it alone.
 //
 // MODES: classic (any real animal), a category mode (mammals/birds/ocean/
-// dinosaurs, checked against js/categories.js), "letters" (must start
-// with whichever letter is currently active -- rotates every 20s, computed
+// dinosaurs, checked against js/categories.js), "letters" (must start with
+// whichever letter is currently active -- rotates every 20s, computed
 // deterministically from the match's startedAt so every client agrees
 // without needing to sync the rotation through the database), "chain"
 // (must start with the last letter of YOUR OWN last correct animal --
@@ -104,6 +104,19 @@ const MODE_SCRIPTS = {
   superheroes: ['superheroes.js'],
   cars: ['cars.js'],
   food_drinks: ['food_drinks.js'],
+  pokemon_classic: ['pokemon.js', 'pokemon_meta.js'],
+  pokemon_basic: ['pokemon.js', 'pokemon_meta.js'],
+  pokemon_stage1: ['pokemon.js', 'pokemon_meta.js'],
+  pokemon_stage2: ['pokemon.js', 'pokemon_meta.js'],
+  pokemon_stage: ['pokemon.js', 'pokemon_meta.js'],
+  pokemon_monotype: ['pokemon.js', 'pokemon_meta.js'],
+  pokemon_legendary: ['pokemon.js', 'pokemon_meta.js'],
+  pokemon_type: ['pokemon.js', 'pokemon_meta.js'],
+  pokemon_gen: ['pokemon.js', 'pokemon_meta.js'],
+  pokemon_letters: ['pokemon.js', 'pokemon_meta.js'],
+  pokemon_chain: ['pokemon.js', 'pokemon_meta.js'],
+  pokemon_type_locked: ['pokemon.js', 'pokemon_meta.js'],
+  pokemon_gen_locked: ['pokemon.js', 'pokemon_meta.js'],
 };
 
 const loadedScripts = new Set();
@@ -149,6 +162,7 @@ function modeNoun(mode) {
   if (mode === 'superheroes') return 'superhero';
   if (mode === 'cars') return 'car';
   if (mode === 'food_drinks') return 'food or drink';
+  if (isPokemonMode(mode)) return 'Pok\u00e9mon';
   return 'animal';
 }
 
@@ -180,6 +194,9 @@ const els = {
   letterBanner: document.getElementById('letter-banner'),
   letterCurrent: document.getElementById('letter-current'),
   letterCountdown: document.getElementById('letter-countdown'),
+  bannerLabel: document.getElementById('banner-label'),
+  bannerValue: document.getElementById('banner-value'),
+  bannerCountdown: document.getElementById('banner-countdown'),
   suddenDeathBanner: document.getElementById('sudden-death-banner'),
   guessForm: document.getElementById('guess-form'),
   guessInput: document.getElementById('guess-input'),
@@ -735,8 +752,17 @@ function render(lobby) {
   }
 
   if (lobby.settings) {
-    const label = MODE_LABELS[lobby.settings.mode] || 'Classic';
-    const prefix = lobby.settings.wasMystery ? 'Mystery \u2192 ' : '';
+    let label = MODE_LABELS[lobby.settings.mode] || 'Classic';
+    if (lobby.settings.mode === 'pokemon_type' && lobby.settings.pokemonType) {
+      label = `Pokémon: ${capitalize(lobby.settings.pokemonType)} type`;
+    } else if (lobby.settings.mode === 'pokemon_gen' && lobby.settings.pokemonGen) {
+      label = `Pokémon: Generation ${lobby.settings.pokemonGen}`;
+    } else if (lobby.settings.mode === 'pokemon_stage') {
+      const stageMap = { basic: 'Basic', stage1: 'Stage 1', stage2: 'Stage 2' };
+      const stage = lobby.settings.pokemonStage || 'basic';
+      label = `Pokémon: ${stageMap[stage] || stage}`;
+    }
+    const prefix = lobby.settings.wasMystery ? 'Mystery → ' : '';
     els.modeBadge.textContent = `${prefix}${label} · ${clock}s clock`;
     els.modeBadge.style.display = 'inline-block';
     if (dictionaryLoadingFor !== lobby.settings.mode) {
@@ -775,11 +801,39 @@ function render(lobby) {
   }
   document.body.classList.toggle('is-sudden-death', lobby.status === 'sudden_death');
 
-  if (lobby.settings?.mode === 'letters' && lobby.startedAt) {
-    const { letter, secondsLeft } = currentLetterRound(lobby.startedAt);
+  // ----- Banner for rotating constraints (letters, type-locked, gen-locked) -----
+  const mode = lobby.settings?.mode;
+  const startedAt = lobby.startedAt;
+  let showBanner = false;
+  let label = '';
+  let value = '';
+  let countdown = '';
+
+  if (mode === 'letters' || mode === 'pokemon_letters') {
+    const { letter, secondsLeft } = currentLetterRound(startedAt);
+    showBanner = true;
+    label = 'Current letter:';
+    value = letter;
+    countdown = lobby.status === 'finished' ? '' : `(next in ${secondsLeft}s)`;
+  } else if (mode === 'pokemon_type_locked') {
+    const { type, secondsLeft } = currentTypeRound(startedAt);
+    showBanner = true;
+    label = 'Current type:';
+    value = capitalize(type);
+    countdown = lobby.status === 'finished' ? '' : `(next in ${secondsLeft}s)`;
+  } else if (mode === 'pokemon_gen_locked') {
+    const { gen, secondsLeft } = currentGenRound(startedAt);
+    showBanner = true;
+    label = 'Current generation:';
+    value = gen;
+    countdown = lobby.status === 'finished' ? '' : `(next in ${secondsLeft}s)`;
+  }
+
+  if (showBanner) {
     els.letterBanner.style.display = 'flex';
-    els.letterCurrent.textContent = letter;
-    els.letterCountdown.textContent = lobby.status === 'finished' ? '' : `(next in ${secondsLeft}s)`;
+    if (els.bannerLabel) els.bannerLabel.textContent = label;
+    if (els.bannerValue) els.bannerValue.textContent = value;
+    if (els.bannerCountdown) els.bannerCountdown.textContent = countdown;
   } else {
     els.letterBanner.style.display = 'none';
   }
@@ -922,7 +976,8 @@ async function onSubmitGuess(e) {
     const clock = clockSecondsFor(cur);
     if (effectiveTime(mine, clock) <= 0) return cur;
 
-    const canonical = matchForMode(raw, cur.settings?.mode);
+    // FIX: pass settings to matchForMode
+    const canonical = matchForMode(raw, cur.settings?.mode, cur.settings);
     cur.usedAnimals = cur.usedAnimals || {};
     let result, delta;
     const now = Date.now();
@@ -951,7 +1006,7 @@ async function onSubmitGuess(e) {
       mine.lastCorrectAt = now;
       mine.correct = (mine.correct || 0) + 1;
       cur.usedAnimals[canonical] = mySlot;
-      if (cur.settings?.mode === 'chain') {
+      if (cur.settings?.mode === 'chain' || cur.settings?.mode === 'pokemon_chain') {
         mine.chainLetter = canonical.charAt(canonical.length - 1).toUpperCase();
       }
     }
@@ -995,8 +1050,6 @@ function showFeedback(entry) {
     els.feedback.classList.add('wrong');
   }
 }
-
-function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
 function showResult(lobby) {
   if (resultShownForFinishedAt === lobby.finishedAt) {

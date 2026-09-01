@@ -16,18 +16,28 @@ const joinBtn = document.getElementById('join-btn');
 const dictCountEl = document.getElementById('dict-count');
 const animalsSubmodes = document.getElementById('animals-submodes');
 const sportsSubmodes = document.getElementById('sports-submodes');
+const pokemonSubmodes = document.getElementById('pokemon-submodes');
 const lengthlockConfig = document.getElementById('lengthlock-config');
 const lengthInput = document.getElementById('length-input');
+const pokemonTypePicker = document.getElementById('pokemon-type-picker');
+const pokemonGenPicker = document.getElementById('pokemon-gen-picker');
+const pokemonStagePicker = document.getElementById('pokemon-stage-picker');
+const typeGrid = document.getElementById('type-grid');
+const genGrid = document.getElementById('gen-grid');
+const stageGrid = document.getElementById('stage-grid');
+let selectedPokemonType = 'fire';
+let selectedPokemonGen = 1;
+let selectedPokemonStage = 'basic';
 
-// Top-level category -> sub-picker visibility, since Animals and Sports are
-// the only two categories with further sub-modes (per the request that
-// grouped NBA/Football under Sports and the animal variants under Animals;
-// every other category is a single flat dictionary with no sub-choice).
+// Top-level category -> sub-picker visibility. Animals, Sports, and Pokemon
+// are the categories with further sub-modes; everything else is a single
+// flat dictionary with no sub-choice.
 document.querySelectorAll('input[name="category"]').forEach((el) => {
   el.addEventListener('change', () => {
     const val = document.querySelector('input[name="category"]:checked')?.value;
     animalsSubmodes.style.display = val === 'animals' ? 'block' : 'none';
     sportsSubmodes.style.display = val === 'sports' ? 'block' : 'none';
+    pokemonSubmodes.style.display = val === 'pokemon' ? 'block' : 'none';
   });
 });
 document.querySelectorAll('input[name="mode"]').forEach((el) => {
@@ -36,6 +46,43 @@ document.querySelectorAll('input[name="mode"]').forEach((el) => {
     lengthlockConfig.style.display = val === 'lengthlock' ? 'block' : 'none';
   });
 });
+document.querySelectorAll('input[name="pokemon_mode"]').forEach((el) => {
+  el.addEventListener('change', () => {
+    const val = document.querySelector('input[name="pokemon_mode"]:checked')?.value;
+    pokemonTypePicker.style.display = val === 'pokemon_type' ? 'block' : 'none';
+    pokemonGenPicker.style.display = val === 'pokemon_gen' ? 'block' : 'none';
+    pokemonStagePicker.style.display = val === 'pokemon_stage' ? 'block' : 'none';
+  });
+});
+
+// Type/generation button rows are plain clickable divs (not radios), so we
+// track the single selection ourselves via a "selected" class.
+typeGrid.querySelectorAll('.type-badge').forEach((badge) => {
+  badge.addEventListener('click', () => {
+    typeGrid.querySelectorAll('.type-badge').forEach((b) => b.classList.remove('selected'));
+    badge.classList.add('selected');
+    selectedPokemonType = badge.dataset.type;
+  });
+});
+typeGrid.querySelector('[data-type="fire"]')?.classList.add('selected');
+
+genGrid.querySelectorAll('.gen-badge').forEach((badge) => {
+  badge.addEventListener('click', () => {
+    genGrid.querySelectorAll('.gen-badge').forEach((b) => b.classList.remove('selected'));
+    badge.classList.add('selected');
+    selectedPokemonGen = parseInt(badge.dataset.gen, 10);
+  });
+});
+genGrid.querySelector('[data-gen="1"]')?.classList.add('selected');
+
+stageGrid.querySelectorAll('.gen-badge').forEach((badge) => {
+  badge.addEventListener('click', () => {
+    stageGrid.querySelectorAll('.gen-badge').forEach((b) => b.classList.remove('selected'));
+    badge.classList.add('selected');
+    selectedPokemonStage = badge.dataset.stage;
+  });
+});
+stageGrid.querySelector('[data-stage="basic"]')?.classList.add('selected');
 
 usernameEl.value = getSavedUsername();
 if (window.ANIMAL_SET) {
@@ -100,6 +147,8 @@ setupConfirmBtn.addEventListener('click', async () => {
     }
   } else if (category === 'sports') {
     mode = document.querySelector('input[name="sport"]:checked')?.value || 'nba';
+  } else if (category === 'pokemon') {
+    mode = document.querySelector('input[name="pokemon_mode"]:checked')?.value || 'pokemon_classic';
   } else if (category === 'mystery') {
     mode = rollMysteryMode();
     wasMystery = true;
@@ -121,6 +170,10 @@ setupConfirmBtn.addEventListener('click', async () => {
     const settings = { mode, clockSeconds, maxPlayers };
     if (wasMystery) settings.wasMystery = true;
     if (requiredLength) settings.requiredLength = requiredLength;
+    // Save the selected sub‑options for Pokémon modes
+    if (mode === 'pokemon_type') settings.pokemonType = selectedPokemonType;
+    if (mode === 'pokemon_gen') settings.pokemonGen = selectedPokemonGen;
+    if (mode === 'pokemon_stage') settings.pokemonStage = selectedPokemonStage;
     await set(ref(db, 'lobbies/' + code), {
       createdAt: serverTimestamp(),
       status: 'waiting',

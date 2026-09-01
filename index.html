@@ -12,7 +12,7 @@
   <div class="masthead">
     <div class="eyebrow">two players · pick a category</div>
     <h1>Rapid Recall</h1>
-    <p class="sub">Race your opponent to name as many real animals, NBA players, or football players as you can. Every correct answer buys you time — every miss costs you five seconds.</p>
+    <p class="sub">Race your opponent to name as many real animals, NBA players, football players, or Pok&eacute;mon as you can. Every correct answer buys you time — every miss costs you five seconds.</p>
   </div>
 
   <div class="card">
@@ -33,6 +33,7 @@
     <div class="mode-options" id="category-options">
       <label class="mode-option"><input type="radio" name="category" value="animals" checked><span>Animals</span></label>
       <label class="mode-option"><input type="radio" name="category" value="sports"><span>Sports</span></label>
+      <label class="mode-option"><input type="radio" name="category" value="pokemon"><span>Pok&eacute;mon</span></label>
       <label class="mode-option"><input type="radio" name="category" value="countries"><span>Countries</span></label>
       <label class="mode-option"><input type="radio" name="category" value="movies"><span>Movies</span></label>
       <label class="mode-option"><input type="radio" name="category" value="tv_shows"><span>TV Shows</span></label>
@@ -69,6 +70,71 @@
       <div class="mode-options" id="sport-options">
         <label class="mode-option"><input type="radio" name="sport" value="nba" checked><span>NBA Players <em>(all-time, first name & surname)</em></span></label>
         <label class="mode-option"><input type="radio" name="sport" value="football"><span>Football Players <em>(all-time, first name & surname)</em></span></label>
+      </div>
+    </div>
+
+    <!-- Sub-mode picker for Pokemon -->
+    <div id="pokemon-submodes" style="display:none; margin-top:16px;">
+      <label class="field-label">Pok&eacute;mon mode</label>
+      <div class="mode-options" id="pokemon-mode-options">
+        <label class="mode-option"><input type="radio" name="pokemon_mode" value="pokemon_classic" checked><span>Classic <em>(all Pok&eacute;mon &amp; forms)</em></span></label>
+        <label class="mode-option"><input type="radio" name="pokemon_mode" value="pokemon_stage"><span>Stages</span></label>
+        <label class="mode-option"><input type="radio" name="pokemon_mode" value="pokemon_legendary"><span>Legendary / Mythical / Ultra Beast</span></label>
+        <label class="mode-option"><input type="radio" name="pokemon_mode" value="pokemon_type"><span>Certain type only</span></label>
+        <label class="mode-option"><input type="radio" name="pokemon_mode" value="pokemon_gen"><span>Certain generation only</span></label>
+        <label class="mode-option"><input type="radio" name="pokemon_mode" value="pokemon_gen_locked"><span>Generation-locked <em>(rotates every 20s)</em></span></label>
+        <label class="mode-option"><input type="radio" name="pokemon_mode" value="pokemon_type_locked"><span>Type-locked <em>(rotates every 20s)</em></span></label>
+        <label class="mode-option"><input type="radio" name="pokemon_mode" value="pokemon_letters"><span>Letter-locked <em>(rotates every 20s)</em></span></label>
+        <label class="mode-option"><input type="radio" name="pokemon_mode" value="pokemon_chain"><span>Chain <em>(start with the last letter of your last Pok&eacute;mon)</em></span></label>
+      </div>
+
+      <div id="pokemon-stage-picker" style="display:none;">
+        <label class="field-label" style="margin-top:14px;">Which stage?</label>
+        <div class="gen-grid" id="stage-grid">
+          <div class="gen-badge" data-stage="basic">Basic</div>
+          <div class="gen-badge" data-stage="stage1">Stage 1</div>
+          <div class="gen-badge" data-stage="stage2">Stage 2</div>
+        </div>
+      </div>
+
+      <div id="pokemon-type-picker" style="display:none;">
+        <label class="field-label" style="margin-top:14px;">Which type?</label>
+        <div class="type-grid" id="type-grid">
+          <div class="type-badge" data-type="normal">Normal</div>
+          <div class="type-badge" data-type="fire">Fire</div>
+          <div class="type-badge" data-type="water">Water</div>
+          <div class="type-badge" data-type="electric">Electric</div>
+          <div class="type-badge" data-type="grass">Grass</div>
+          <div class="type-badge" data-type="ice">Ice</div>
+          <div class="type-badge" data-type="fighting">Fighting</div>
+          <div class="type-badge" data-type="poison">Poison</div>
+          <div class="type-badge" data-type="ground">Ground</div>
+          <div class="type-badge" data-type="flying">Flying</div>
+          <div class="type-badge" data-type="psychic">Psychic</div>
+          <div class="type-badge" data-type="bug">Bug</div>
+          <div class="type-badge" data-type="rock">Rock</div>
+          <div class="type-badge" data-type="ghost">Ghost</div>
+          <div class="type-badge" data-type="dragon">Dragon</div>
+          <div class="type-badge" data-type="dark">Dark</div>
+          <div class="type-badge" data-type="steel">Steel</div>
+          <div class="type-badge" data-type="fairy">Fairy</div>
+        </div>
+        <p class="hint">Dual-type Pok&eacute;mon count if this is either of their two types.</p>
+      </div>
+
+      <div id="pokemon-gen-picker" style="display:none;">
+        <label class="field-label" style="margin-top:14px;">Which generation?</label>
+        <div class="gen-grid" id="gen-grid">
+          <div class="gen-badge" data-gen="1"><span class="gen-num">I</span><span class="gen-region">Kanto</span></div>
+          <div class="gen-badge" data-gen="2"><span class="gen-num">II</span><span class="gen-region">Johto</span></div>
+          <div class="gen-badge" data-gen="3"><span class="gen-num">III</span><span class="gen-region">Hoenn</span></div>
+          <div class="gen-badge" data-gen="4"><span class="gen-num">IV</span><span class="gen-region">Sinnoh</span></div>
+          <div class="gen-badge" data-gen="5"><span class="gen-num">V</span><span class="gen-region">Unova</span></div>
+          <div class="gen-badge" data-gen="6"><span class="gen-num">VI</span><span class="gen-region">Kalos</span></div>
+          <div class="gen-badge" data-gen="7"><span class="gen-num">VII</span><span class="gen-region">Alola</span></div>
+          <div class="gen-badge" data-gen="8"><span class="gen-num">VIII</span><span class="gen-region">Galar</span></div>
+          <div class="gen-badge" data-gen="9"><span class="gen-num">IX</span><span class="gen-region">Paldea</span></div>
+        </div>
       </div>
     </div>
 
