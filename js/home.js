@@ -170,7 +170,6 @@ setupConfirmBtn.addEventListener('click', async () => {
     const settings = { mode, clockSeconds, maxPlayers };
     if (wasMystery) settings.wasMystery = true;
     if (requiredLength) settings.requiredLength = requiredLength;
-    // Save the selected sub‑options for Pokémon modes
     if (mode === 'pokemon_type') settings.pokemonType = selectedPokemonType;
     if (mode === 'pokemon_gen') settings.pokemonGen = selectedPokemonGen;
     if (mode === 'pokemon_stage') settings.pokemonStage = selectedPokemonStage;

@@ -41,16 +41,25 @@
       <div class="dot-pulse"></div> <span id="waiting-status-text">Waiting for players…</span>
     </div>
     <button class="become-spectator-btn" id="become-spectator-btn" style="display:none;">Switch to spectator instead</button>
-    <p class="hint">Anyone else who enters this code once the duel starts joins as a spectator.</p>
+    <p class="hint">Anyone else who enters this code once the battle starts joins as a spectator.</p>
   </div>
 
   <!-- Main game -->
   <div class="game-wrap" id="game-panel" style="display:none;">
 
     <div class="letter-banner" id="letter-banner" style="display:none;">
-      <span id="banner-label">Current letter:</span>
-      <span class="letter-big" id="banner-value">A</span>
-      <span id="banner-countdown">(20s)</span>
+      Current letter: <span class="letter-big" id="letter-current">A</span>
+      <span id="letter-countdown">(20s)</span>
+    </div>
+
+    <div class="letter-banner" id="pokemon-gen-banner" style="display:none;">
+      Current generation: <span class="letter-big" id="pokemon-gen-current">1</span>
+      <span id="pokemon-gen-countdown">(20s)</span>
+    </div>
+
+    <div class="letter-banner" id="pokemon-type-banner" style="display:none;">
+      Current type: <span class="letter-big" id="pokemon-type-current">Fire</span>
+      <span id="pokemon-type-countdown">(20s)</span>
     </div>
 
     <div class="sudden-death-banner" id="sudden-death-banner" style="display:none;">
