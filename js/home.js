@@ -1,6 +1,3 @@
-// Home screen: create a lobby or join one by code.
-// Waits for firebase-init.js (loaded just before this) to have populated window.__fb.
-
 function fb() { return window.__fb; }
 
 const usernameEl = document.getElementById('username');
@@ -28,16 +25,23 @@ const stageGrid = document.getElementById('stage-grid');
 let selectedPokemonType = 'fire';
 let selectedPokemonGen = 1;
 let selectedPokemonStage = 'basic';
+const comboSubmodes = document.getElementById('combo-submodes');
+const comboPick3Label = document.getElementById('combo-pick-3-label');
+const comboPick3 = document.getElementById('combo-pick-3');
+const comboErrorEl = document.getElementById('combo-error');
+const comboSelects = [
+  document.getElementById('combo-pick-1'),
+  document.getElementById('combo-pick-2'),
+  document.getElementById('combo-pick-3'),
+];
 
-// Top-level category -> sub-picker visibility. Animals, Sports, and Pokemon
-// are the categories with further sub-modes; everything else is a single
-// flat dictionary with no sub-choice.
 document.querySelectorAll('input[name="category"]').forEach((el) => {
   el.addEventListener('change', () => {
     const val = document.querySelector('input[name="category"]:checked')?.value;
     animalsSubmodes.style.display = val === 'animals' ? 'block' : 'none';
     sportsSubmodes.style.display = val === 'sports' ? 'block' : 'none';
     pokemonSubmodes.style.display = val === 'pokemon' ? 'block' : 'none';
+    comboSubmodes.style.display = val === 'combo' ? 'block' : 'none';
   });
 });
 document.querySelectorAll('input[name="mode"]').forEach((el) => {
@@ -55,8 +59,6 @@ document.querySelectorAll('input[name="pokemon_mode"]').forEach((el) => {
   });
 });
 
-// Type/generation button rows are plain clickable divs (not radios), so we
-// track the single selection ourselves via a "selected" class.
 typeGrid.querySelectorAll('.type-badge').forEach((badge) => {
   badge.addEventListener('click', () => {
     typeGrid.querySelectorAll('.type-badge').forEach((b) => b.classList.remove('selected'));
@@ -83,6 +85,24 @@ stageGrid.querySelectorAll('.gen-badge').forEach((badge) => {
   });
 });
 stageGrid.querySelector('[data-stage="basic"]')?.classList.add('selected');
+
+const comboOptionsHtml = ['<option value="mystery">Mystery (random)</option>']
+  .concat(COMBO_BASE_CATEGORIES.map((c) => `<option value="${c}">${COMBO_CATEGORY_LABELS[c]}</option>`))
+  .join('');
+comboSelects.forEach((sel) => { sel.innerHTML = comboOptionsHtml; });
+comboSelects[0].value = 'classic';
+comboSelects[1].value = 'movies';
+comboSelects[2].value = 'pokemon_classic';
+
+function updateComboVisibility() {
+  const count = parseInt(document.querySelector('input[name="combo_count"]:checked')?.value || '2', 10);
+  comboPick3Label.style.display = count === 3 ? 'block' : 'none';
+  comboPick3.style.display = count === 3 ? 'block' : 'none';
+}
+document.querySelectorAll('input[name="combo_count"]').forEach((el) => {
+  el.addEventListener('change', updateComboVisibility);
+});
+updateComboVisibility();
 
 usernameEl.value = getSavedUsername();
 if (window.ANIMAL_SET) {
@@ -149,13 +169,39 @@ setupConfirmBtn.addEventListener('click', async () => {
     mode = document.querySelector('input[name="sport"]:checked')?.value || 'nba';
   } else if (category === 'pokemon') {
     mode = document.querySelector('input[name="pokemon_mode"]:checked')?.value || 'pokemon_classic';
+  } else if (category === 'combo') {
+    mode = 'combo';
   } else if (category === 'mystery') {
     mode = rollMysteryMode();
     wasMystery = true;
-    if (mode === 'lengthlock') requiredLength = 5; // shouldn't occur (excluded from pool), but stay safe
+    if (mode === 'lengthlock') requiredLength = 5;
   } else {
-    // countries / movies / tv_shows / artists / actors / superheroes / cars: category value IS the mode key
     mode = category;
+  }
+
+  let comboCategories = null;
+  let comboMysterySlots = null;
+  if (mode === 'combo') {
+    comboErrorEl.textContent = '';
+    const count = parseInt(document.querySelector('input[name="combo_count"]:checked')?.value || '2', 10);
+    const picks = comboSelects.slice(0, count).map((sel) => sel.value);
+
+    const explicitPicks = picks.filter((p) => p !== 'mystery');
+    if (new Set(explicitPicks).size !== explicitPicks.length) {
+      comboErrorEl.textContent = 'Pick a different category for each slot (Mystery can repeat).';
+      return;
+    }
+
+    comboMysterySlots = [];
+    const taken = new Set(explicitPicks);
+    comboCategories = picks.map((p, i) => {
+      if (p !== 'mystery') return p;
+      comboMysterySlots.push(i);
+      const pool = COMBO_BASE_CATEGORIES.filter((c) => !taken.has(c));
+      const rolled = pool[Math.floor(Math.random() * pool.length)] || COMBO_BASE_CATEGORIES[0];
+      taken.add(rolled);
+      return rolled;
+    });
   }
 
   const clockSeconds = parseInt(document.querySelector('input[name="clock"]:checked')?.value || '120', 10);
@@ -173,6 +219,10 @@ setupConfirmBtn.addEventListener('click', async () => {
     if (mode === 'pokemon_type') settings.pokemonType = selectedPokemonType;
     if (mode === 'pokemon_gen') settings.pokemonGen = selectedPokemonGen;
     if (mode === 'pokemon_stage') settings.pokemonStage = selectedPokemonStage;
+    if (mode === 'combo') {
+      settings.comboCategories = comboCategories;
+      if (comboMysterySlots && comboMysterySlots.length) settings.comboMysterySlots = comboMysterySlots;
+    }
     await set(ref(db, 'lobbies/' + code), {
       createdAt: serverTimestamp(),
       status: 'waiting',
@@ -204,9 +254,6 @@ joinBtn.addEventListener('click', () => {
     return;
   }
   joinErrorEl.textContent = '';
-  // All slot/spectator resolution happens on game.html itself, so a
-  // reconnect or a spectate-fallback works the same whether someone
-  // arrives from this button or opens a shared link directly.
   window.location.href = `game.html?code=${code}`;
 });
 

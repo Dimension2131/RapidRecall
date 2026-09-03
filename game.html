@@ -16,8 +16,6 @@
     <div class="mode-badge" id="mode-badge" style="display:none;"></div>
   </div>
 
-  <!-- Shown only if this browser wasn't the one that created/joined via the home page
-       (e.g. someone opened a shared link directly) and a player slot is still open. -->
   <div class="card" id="join-panel" style="display:none;">
     <label class="field-label" for="join-username">Your name</label>
     <input type="text" id="join-username" maxlength="18" placeholder="e.g. Wren" autocomplete="off">
@@ -95,7 +93,7 @@
 <!-- Result overlay -->
 <div class="overlay" id="result-overlay" style="display:none;">
   <div class="result-card">
-    <div class="eyebrow">duel complete</div>
+    <div class="eyebrow">battle complete</div>
     <h2 id="result-title">—</h2>
     <p class="hint" id="result-sub" style="margin-top:-6px;"></p>
     <div class="result-tally" id="result-tally"></div>
@@ -112,6 +110,12 @@
 <script src="js/firebase-config.js"></script>
 <script type="module" src="js/firebase-init.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/game-core.js"></script>
+<script src="js/game-lobby.js"></script>
+<script src="js/game-round.js"></script>
+<script src="js/game-render.js"></script>
+<script src="js/game-guess.js"></script>
+<script src="js/game-admin.js"></script>
 <script type="module" src="js/game.js"></script>
 </body>
 </html>

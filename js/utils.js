@@ -1,7 +1,3 @@
-// Shared helpers used by both the home screen and the game screen.
-
-/** Generate a short random client id, persisted per-browser so a page refresh
- *  can reconnect to the same lobby slot instead of registering as a 3rd player. */
 function getClientId() {
   let id = localStorage.getItem('aw_client_id');
   if (!id) {
@@ -19,30 +15,11 @@ function saveUsername(name) {
   localStorage.setItem('aw_username', name);
 }
 
-/** Generate a 6-digit numeric lobby code as a zero-padded string, e.g. "042817". */
 function generateLobbyCode() {
   const n = Math.floor(Math.random() * 1000000);
   return n.toString().padStart(6, '0');
 }
 
-/** Normalize a raw guess for dictionary + duplicate lookup:
- *  lowercase, trim, fold accents (so "Ümit" and "Umit" match identically --
- *  useful for player names), strip hyphens and periods (so "aye-aye" /
- *  "aye aye" and "A.J." / "AJ" all match identically), collapse whitespace,
- *  drop a leading article, strip surrounding punctuation. */
-/** Normalize a raw guess for dictionary + duplicate lookup:
- *  lowercase, trim, fold accents (so "Ümit" and "Umit" match identically --
- *  useful for player names), strip hyphens and periods (so "aye-aye" /
- *  "aye aye" and "A.J." / "AJ" all match identically), collapse whitespace,
- *  strip surrounding punctuation.
- *
- *  Leading-article stripping ("a"/"an"/"the") is OPTIONAL and OFF by
- *  default -- pass { stripArticle: true } for animal guesses, where "a
- *  lion" and "lion" obviously mean the same thing. For proper names/titles
- *  (movies, TV shows, artists, etc.) the article is often semantically
- *  part of the actual name -- "The Boys" is a specific, different show
- *  from any hypothetical show just called "Boys" -- so stripping it there
- *  would incorrectly collapse two different real answers into one. */
 function normalizeGuess(raw, opts) {
   opts = opts || {};
   let s = (raw || '').toLowerCase().trim();
@@ -57,8 +34,6 @@ function normalizeGuess(raw, opts) {
   return s;
 }
 
-// Common irregular plurals that don't follow a suffix rule, mapped both ways
-// so a guess in either form resolves to whichever one the dictionary has.
 const IRREGULAR_PLURALS = {
   goose: 'geese', mouse: 'mice', louse: 'lice', ox: 'oxen',
   child: 'children', person: 'people', tooth: 'teeth', foot: 'feet',
@@ -68,11 +43,8 @@ const IRREGULAR_PLURALS = {
 const IRREGULAR_REVERSE = Object.fromEntries(
   Object.entries(IRREGULAR_PLURALS).map(([sing, plur]) => [plur, sing])
 );
-IRREGULAR_REVERSE['octopi'] = 'octopus'; // alternate plural, in addition to "octopuses"
+IRREGULAR_REVERSE['octopi'] = 'octopus'; 
 
-/** Try a handful of light singular/plural variants so "wolves", "foxes",
- *  "geese", "mice", "sheep" etc. all resolve sensibly against the
- *  dictionary, which stores canonical singular (mostly) forms. */
 function candidateForms(norm) {
   const forms = new Set([norm]);
   if (IRREGULAR_PLURALS[norm]) forms.add(IRREGULAR_PLURALS[norm]);
@@ -84,15 +56,10 @@ function candidateForms(norm) {
   }
   if (norm.endsWith('es') && norm.length > 2) forms.add(norm.slice(0, -2));
   if (norm.endsWith('s') && norm.length > 1) forms.add(norm.slice(0, -1));
-  // also try adding 's' in case dictionary only has the plural headword
   forms.add(norm + 's');
   return Array.from(forms);
 }
 
-/** Returns the canonical dictionary form of `raw` if it names a real animal,
- *  otherwise null. Using this canonical form (rather than the raw text) as
- *  the de-duplication key means "wolf" and "wolves" are treated as the same
- *  already-used animal. */
 function matchAnimal(raw) {
   const norm = normalizeGuess(raw, { stripArticle: true });
   if (!norm) return null;
@@ -102,10 +69,6 @@ function matchAnimal(raw) {
   return null;
 }
 
-/** Exact-match lookup for name/title dictionaries (NBA/football/movies/etc.)
- *  where, unlike animal names, there's no singular/plural to reconcile --
- *  a full name either matches an entry or it doesn't -- and articles are
- *  NOT stripped, since they're often part of the actual name. */
 function matchInSet(raw, set) {
   if (!set) return null;
   const norm = normalizeGuess(raw, { stripArticle: false });
@@ -113,15 +76,17 @@ function matchInSet(raw, set) {
   return set.has(norm) ? norm : null;
 }
 
-/** Given a mode key, returns the right verifier function's result for a raw
- *  guess: the matched canonical form, or null if it's not a real entry in
- *  that mode's underlying dictionary. Category/letter/chain/lengthlock modes
- *  still draw from ANIMAL_SET (matchesMode / passesConstraint layer the
- *  extra restriction on top); the rest draw from their own separate
- *  dictionaries. */
 function isPokemonMode(mode) { return typeof mode === 'string' && mode.indexOf('pokemon') === 0; }
 
-function matchForMode(raw, mode) {
+function matchForMode(raw, mode, settings) {
+  if (mode === 'combo') {
+    const cats = (settings && settings.comboCategories) || [];
+    for (const cat of cats) {
+      const m = matchForMode(raw, cat);
+      if (m) return m;
+    }
+    return null;
+  }
   if (mode === 'nba') return matchInSet(raw, window.NBA_PLAYERS);
   if (mode === 'football') return matchInSet(raw, window.FOOTBALL_PLAYERS);
   if (mode === 'countries') return matchInSet(raw, window.COUNTRIES);
@@ -136,11 +101,6 @@ function matchForMode(raw, mode) {
   return matchAnimal(raw);
 }
 
-/** The extra restriction for Pokemon sub-modes, checked against
- *  window.POKEMON_META (types/gen/evolution-stage/legendary-mythical-UB/
- *  rotating gen-locked/type-locked). Defined further down, alongside the
- *  rotation helpers it shares with letter-locked mode. */
-
 function formatTime(seconds) {
   const s = Math.max(0, Math.ceil(seconds));
   const m = Math.floor(s / 60);
@@ -149,6 +109,17 @@ function formatTime(seconds) {
 }
 
 // ---------------- Game modes ----------------
+const COMBO_BASE_CATEGORIES = [
+  'classic', 'nba', 'football', 'countries', 'movies', 'tv_shows',
+  'artists', 'actors', 'superheroes', 'cars', 'food_drinks', 'pokemon_classic',
+];
+
+const COMBO_CATEGORY_LABELS = {
+  classic: 'Animals', nba: 'NBA', football: 'Football', countries: 'Countries',
+  movies: 'Movies', tv_shows: 'TV Shows', artists: 'Artists', actors: 'Actors',
+  superheroes: 'Superheroes', cars: 'Cars', food_drinks: 'Food & Drinks',
+  pokemon_classic: 'Pok\u00e9mon',
+};
 
 const MODE_LABELS = {
   classic: 'Classic (all animals)',
@@ -178,12 +149,9 @@ const MODE_LABELS = {
   pokemon_type_locked: 'Pok\u00e9mon: Type-locked (rotates every 20s)',
   pokemon_letters: 'Pok\u00e9mon: Letter-locked',
   pokemon_chain: 'Pok\u00e9mon: Chain',
+  combo: 'Combo Category',
 };
 
-// Mode keys eligible for Mystery Category to roll from -- the animal
-// "modifier" modes (letters/chain/lengthlock) are left out since they're
-// mechanics layered on classic animals rather than distinct content pools,
-// and would make Mystery mostly just re-roll animal variants.
 const MYSTERY_POOL = [
   'classic', 'mammals', 'birds', 'ocean', 'dinosaurs',
   'nba', 'football', 'countries', 'movies', 'tv_shows',
@@ -195,11 +163,6 @@ function rollMysteryMode() {
   return MYSTERY_POOL[Math.floor(Math.random() * MYSTERY_POOL.length)];
 }
 
-// Deterministic per-round shuffle of a list of items, seeded from the
-// match's start time so every client (both players + any spectators/admin)
-// computes the exact same sequence without needing to sync it through the
-// database. Used by letter-locked, and by Pokemon's generation-locked and
-// type-locked modes.
 function seededSequence(seed, items) {
   const arr = items.slice();
   let s = seed >>> 0;
@@ -222,11 +185,8 @@ function seededLetterSequence(seed) {
 }
 
 const ROTATE_ROUND_SECONDS = 20;
-const LETTER_ROUND_SECONDS = ROTATE_ROUND_SECONDS; // kept for any external references to the old name
+const LETTER_ROUND_SECONDS = ROTATE_ROUND_SECONDS;
 
-/** Generic "what's currently active, and how long until it rotates" helper
- *  for any 20s-rotating-lock mode (letters, Pokemon generation, Pokemon
- *  type). */
 function currentRotation(startedAt, items) {
   const seq = seededSequence(startedAt || 0, items);
   const elapsed = Math.max(0, (Date.now() - (startedAt || Date.now())) / 1000);
@@ -235,8 +195,6 @@ function currentRotation(startedAt, items) {
   return { value: seq[idx], secondsLeft: Math.ceil(ROTATE_ROUND_SECONDS - into) };
 }
 
-/** Given a match's startedAt timestamp, returns the currently-active letter
- *  for the "letters" mode, plus seconds remaining until it rotates. */
 function currentLetterRound(startedAt) {
   const { value, secondsLeft } = currentRotation(startedAt, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''));
   return { letter: value, secondsLeft };
@@ -263,7 +221,7 @@ function matchesMode(canonical, mode, startedAt) {
   if (mode === 'classic' || mode === 'nba' || mode === 'football' ||
       mode === 'countries' || mode === 'movies' || mode === 'tv_shows' ||
       mode === 'artists' || mode === 'actors' || mode === 'superheroes' ||
-      mode === 'cars' || mode === 'food_drinks') {
+      mode === 'cars' || mode === 'food_drinks' || mode === 'combo') {
     return true;
   }
   if (mode === 'letters') {
@@ -274,8 +232,6 @@ function matchesMode(canonical, mode, startedAt) {
   return set ? set.has(canonical) : true;
 }
 
-/** The extra restriction for Pokemon sub-modes, checked against
- *  window.POKEMON_META (types/gen/evolution-stage/legendary-mythical-UB). */
 function matchesPokemonMode(canonical, mode, settings) {
   if (mode === 'pokemon_classic') return true;
   const meta = window.POKEMON_META && window.POKEMON_META[canonical];
@@ -295,15 +251,9 @@ function matchesPokemonMode(canonical, mode, settings) {
   return true;
 }
 
-/** Chain mode and length-lock mode need per-player mutable state (the
- *  required next starting letter; a configured exact length) rather than
- *  something derivable purely from the lobby's mode + startedAt, so they're
- *  checked here against the specific player's record instead of folded into
- *  matchesMode above. Returns true/false; game.js calls this for those two
- *  modes specifically and falls back to matchesMode for everything else. */
 function passesPlayerConstraint(canonical, mode, player, settings) {
   if (mode === 'chain' || mode === 'pokemon_chain') {
-    if (!player || !player.chainLetter) return true; // first guess of the game is free
+    if (!player || !player.chainLetter) return true;
     return canonical.charAt(0).toUpperCase() === player.chainLetter;
   }
   if (mode === 'lengthlock') {

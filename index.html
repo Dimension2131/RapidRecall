@@ -10,9 +10,9 @@
 <div class="page">
 
   <div class="masthead">
-    <div class="eyebrow">two players · pick a category</div>
+    <div class="eyebrow">2-4 players · pick a category</div>
     <h1>Rapid Recall</h1>
-    <p class="sub">Race your opponent to name as many real animals, NBA players, football players, or Pok&eacute;mon as you can. Every correct answer buys you time — every miss costs you five seconds.</p>
+    <p class="sub">Race your opponent to name as many from the selected category. Every correct answer buys you time — every miss costs you five seconds.</p>
   </div>
 
   <div class="card">
@@ -27,7 +27,7 @@
     <button class="btn btn-primary" id="create-btn">Create lobby</button>
   </div>
 
-  <!-- Game setup: shown after "Create lobby" is clicked, before the code exists. -->
+  <!-- Game setup -->
   <div class="card" id="setup-panel" style="display:none;">
     <label class="field-label">Category</label>
     <div class="mode-options" id="category-options">
@@ -42,6 +42,7 @@
       <label class="mode-option"><input type="radio" name="category" value="superheroes"><span>Superheroes <em>(Marvel, DC & more)</em></span></label>
       <label class="mode-option"><input type="radio" name="category" value="cars"><span>Cars</span></label>
       <label class="mode-option"><input type="radio" name="category" value="food_drinks"><span>Food &amp; Drinks</span></label>
+      <label class="mode-option"><input type="radio" name="category" value="combo"><span>Combo Category <em>(pick 2-3 to guess from together)</em></span></label>
       <label class="mode-option"><input type="radio" name="category" value="mystery"><span>Mystery Category <em>(random pick, revealed at start)</em></span></label>
     </div>
 
@@ -136,6 +137,26 @@
           <div class="gen-badge" data-gen="9"><span class="gen-num">IX</span><span class="gen-region">Paldea</span></div>
         </div>
       </div>
+    </div>
+
+    <div id="combo-submodes" style="display:none; margin-top:16px;">
+      <label class="field-label">Number of categories</label>
+      <div class="clock-options" id="combo-count-options">
+        <label class="clock-option"><input type="radio" name="combo_count" value="2" checked><span>2</span></label>
+        <label class="clock-option"><input type="radio" name="combo_count" value="3"><span>3</span></label>
+      </div>
+
+      <label class="field-label" style="margin-top:16px;" for="combo-pick-1">Category 1</label>
+      <select id="combo-pick-1" class="combo-select"></select>
+
+      <label class="field-label" style="margin-top:12px;" for="combo-pick-2">Category 2</label>
+      <select id="combo-pick-2" class="combo-select"></select>
+
+      <label class="field-label" style="margin-top:12px;" for="combo-pick-3" id="combo-pick-3-label">Category 3</label>
+      <select id="combo-pick-3" class="combo-select"></select>
+
+      <div class="error-msg" id="combo-error"></div>
+      <p class="hint">Any guess that's real in <em>any</em> of your picked categories counts. Pick &quot;Mystery&quot; for a slot to have it randomly assigned at creation.</p>
     </div>
 
     <label class="field-label" style="margin-top:20px;">Players</label>

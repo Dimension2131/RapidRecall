@@ -283,6 +283,24 @@ input[type="number"]:focus {
   box-shadow: 0 0 0 3px rgba(185, 149, 80, 0.09);
 }
 
+select.combo-select {
+  width: 100%;
+  font-family: 'Manrope', sans-serif;
+  font-size: 15px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+select.combo-select:focus {
+  border-color: var(--brass);
+  background: #22261f;
+}
+
 input[type="text"].mono {
   font-family: 'Fira Code', monospace;
   letter-spacing: 0.3em;
